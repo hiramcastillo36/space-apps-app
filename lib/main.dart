@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-        home: const Index(),
+        home: const AuthPage(),
     );
   }
 }

@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.10.0-278.0.dev
+  sdk: ^3.10.0-162.1.dev
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -62,7 +62,9 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
+  assets:
+    - assets/images/logo_rojo.png
+    - assets/images/logo_azul.png
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
