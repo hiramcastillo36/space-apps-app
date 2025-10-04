@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:skai/utils/constans.dart';
+import 'package:skai/utils/constans.dart'; // revisa el nombre del archivo
 
 class Index extends StatelessWidget {
   const Index({super.key});
@@ -9,7 +9,7 @@ class Index extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC), // Color de fondo general
+      backgroundColor: const Color(0xFFF7F9FC),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -25,9 +25,6 @@ class Index extends StatelessWidget {
                 const SizedBox(height: 20),
                 _buildPopularActivitiesGrid(),
                 const SizedBox(height: 30),
-                _buildSectionTitle('Recent activities'),
-                const SizedBox(height: 20),
-                _buildRecentActivities(),
               ],
             ),
           ),
@@ -37,79 +34,137 @@ class Index extends StatelessWidget {
     );
   }
 
-  // --- Widgets Separados para Claridad ---
-
+  // ---------------- Header con degradado en ambas líneas ----------------
   Widget _buildHeader() {
+    const gradient = LinearGradient(
+      colors: [
+        Color(0xFF5B86E5), // azul
+        Color(0xFF9C27B0), // violeta
+        Color(0xFFE91E63), // rosa
+      ],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Hello, Chino!',
-          style: GoogleFonts.poppins(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: primaryTextColor,
+        ShaderMask(
+          shaderCallback: (bounds) => gradient.createShader(bounds),
+          child: Text(
+            'Hello, Chino!',
+            style: GoogleFonts.poppins(
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+              color: Colors.white, // necesario para que el Shader pinte el gradiente
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'What do you have planned for today?',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            color: secondaryTextColor,
+        const SizedBox(height: 12),
+        ShaderMask(
+          shaderCallback: (bounds) => gradient.createShader(bounds),
+          child: Text(
+            'What do you have planned for today?',
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
           ),
         ),
       ],
     );
   }
 
+  // ---------------- Tarjeta Ask SkAI con GIF circular escalable ----------------
   Widget _buildAskOlivCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: primaryCardColor,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF5C6BC0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.15),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Ask Oliv',
-            style: GoogleFonts.poppins(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE1BEE7), Color(0xFFBBDEFB)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          Flexible(
+            child: Text(
+              'Ask SkAI',
+              style: GoogleFonts.poppins(
+                fontSize: 28,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          _olivGifCircle(size: 120), // ⇦ ajusta el tamaño aquí (p.ej. 110, 130, 140)
         ],
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.poppins(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        color: primaryTextColor,
+  // Helper: círculo con aro blanco + gradiente + GIF animado dentro
+  Widget _olivGifCircle({double size = 110}) {
+    final borderW = size * 0.10;   // grosor del aro blanco
+    final glow    = size * 0.08;   // brillo suave
+    final innerPad = size * 0.12;  // espacio entre aro y GIF (reduce para que el GIF se vea aún más grande)
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: borderW),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(innerPad),
+        child: ClipOval(
+          child: Image.asset(
+            'assets/images/sphere.gif',
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) {
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
       ),
     );
   }
 
+  // ---------------- Sección: título con degradado ----------------
+  Widget _buildSectionTitle(String title) {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Color(0xFFAB47BC), Color(0xFF42A5F5)],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(bounds),
+      child: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  // ---------------- Grid de actividades ----------------
   Widget _buildPopularActivitiesGrid() {
     return GridView.count(
       crossAxisCount: 2,
@@ -117,7 +172,7 @@ class Index extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.2, // Ajusta esto para cambiar la proporción de las tarjetas
+      childAspectRatio: 1.2,
       children: [
         _buildActivityCard(FontAwesomeIcons.personRunning, 'Running'),
         _buildActivityCard(FontAwesomeIcons.mountain, 'Climbing'),
@@ -159,32 +214,7 @@ class Index extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentActivities() {
-    return Row(
-      children: [
-        _buildSmallActivityChip(FontAwesomeIcons.baseball, 'Baseball'),
-        const SizedBox(width: 16),
-        _buildSmallActivityChip(FontAwesomeIcons.golfBallTee, 'Golf'),
-      ],
-    );
-  }
-
-  Widget _buildSmallActivityChip(IconData icon, String label) {
-    return Chip(
-      avatar: FaIcon(icon, size: 16, color: Colors.grey[700]),
-      label: Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: Colors.grey[800],
-        ),
-      ),
-      backgroundColor: cardBackgroundColor,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    );
-  }
-
+  // ---------------- Bottom bar ----------------
   Widget _buildBottomNavBar() {
     return Container(
       height: 80,
@@ -236,13 +266,11 @@ class Index extends StatelessWidget {
       width: 60,
       height: 60,
       decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: cardBackgroundColor,
-          border: Border.all(color: Colors.grey.shade300, width: 2)
+        shape: BoxShape.circle,
       ),
       child: const Center(
         child: FaIcon(
-          FontAwesomeIcons.ring, // Un ícono de ejemplo
+          FontAwesomeIcons.ring,
           color: primaryTextColor,
         ),
       ),
