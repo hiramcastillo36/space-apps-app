@@ -44,6 +44,7 @@ dependencies:
   http: ^1.2.2
   shared_preferences: ^2.3.3
   geolocator:
+  flutter_launcher_icons: ^0.14.4
 
 
 dev_dependencies:
@@ -68,6 +69,7 @@ flutter:
     - assets/images/logo_rojo.png
     - assets/images/logo_azul.png
     - assets/images/sphere.gif
+    - assets/images/logoG.png
 
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
@@ -107,3 +109,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logoG.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logoG.png"

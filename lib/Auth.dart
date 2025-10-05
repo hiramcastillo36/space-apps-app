@@ -86,7 +86,7 @@ class _AuthPageState extends State<AuthPage> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Image.asset('assets/images/logo_azul.png', width: 220, height: 220),
+        Image.asset('assets/images/logoG.png', width: 220, height: 220),
         const SizedBox(height: 8),
       ],
     );
@@ -315,33 +315,49 @@ class _AuthFormState extends State<AuthForm> {
             ),
           ],
           const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _handleSubmit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryCardColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
+          Container(
+  decoration: BoxDecoration(
+    gradient: const LinearGradient(
+      colors: [
+        Color(0xFF5B86E5),
+        Color(0xFF9C27B0),
+        Color(0xFFE91E63),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    borderRadius: BorderRadius.circular(30),
+  ),
+  child: ElevatedButton(
+    onPressed: _isLoading ? null : _handleSubmit,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.transparent,
+      shadowColor: Colors.transparent,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+      ),
+    ),
+    child: _isLoading
+        ? const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2,
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : Text(
-                    widget.isLogin ? 'Login' : 'Create Account',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+          )
+        : Text(
+            widget.isLogin ? 'Login' : 'Create Account',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
+  ),
+)
+
         ],
       ),
     );
