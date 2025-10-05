@@ -14,20 +14,29 @@ class NavigationShell extends StatefulWidget {
 
 class _NavigationShellState extends State<NavigationShell> {
   int _selectedIndex = 0;
+  int _skaiPageKey = 0;
 
   // Si quieres preservar posiciones de scroll entre tabs
   final PageStorageBucket _bucket = PageStorageBucket();
 
-  late final List<Widget> _pages = <Widget>[
-    Index(onOpenSkai: () => _onItemTapped(1)),
-    const SkaiPage(),
-    const Eventos(),
-    const ProfilePage(),
-  ];
-
   void _onItemTapped(int index) {
     if (!mounted) return;
-    setState(() => _selectedIndex = index);
+    setState(() {
+      // Si estamos navegando a SkAI, crear una nueva instancia
+      if (index == 1 && _selectedIndex != 1) {
+        _skaiPageKey++;
+      }
+      _selectedIndex = index;
+    });
+  }
+
+  List<Widget> _buildPages() {
+    return <Widget>[
+      Index(onOpenSkai: () => _onItemTapped(1)),
+      SkaiPage(key: ValueKey(_skaiPageKey)),
+      const Eventos(),
+      const ProfilePage(),
+    ];
   }
 
   @override
@@ -38,7 +47,7 @@ class _NavigationShellState extends State<NavigationShell> {
         bucket: _bucket,
         child: IndexedStack(
           index: _selectedIndex,
-          children: _pages,
+          children: _buildPages(),
         ),
       ),
       bottomNavigationBar: SafeArea(
