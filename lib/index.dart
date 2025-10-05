@@ -116,18 +116,13 @@ class Index extends StatelessWidget {
     );
   }
 
-  /// Helper: círculo con aro blanco + (opcional) gradiente suave + GIF animado dentro
-  ///
-  /// [size]         Tamaño total del círculo (externo).
-  /// [ringWidthPx]  Grosor del aro blanco (en px). Si es null, se calcula proporcionalmente.
-  /// [gapPx]        Separación interna entre aro y GIF (en px). Menos gap => GIF más grande.
   Widget _olivGifCircle({
     double size = 110,
     double? ringWidthPx,
     double? gapPx,
   }) {
-    final borderW  = ringWidthPx ?? size * 0.055; // más delgado que antes
-    final innerPad = gapPx ?? size * 0.05;        // menos espacio => GIF más grande
+    final borderW  = ringWidthPx ?? size * 0.055;
+    final innerPad = gapPx ?? size * 0.05;
     final glow     = size * 0.07;
 
     return Container(
