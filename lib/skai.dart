@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// --- Modelos y Enums ---
 class ChatMessage {
   final String text;
   final bool isUser;
@@ -22,6 +21,7 @@ class SkaiPage extends StatefulWidget {
 
 class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   // 1. DECLARACIÓN DE VARIABLES DE ESTADO
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
@@ -61,6 +61,18 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
         isUser: false,
       ),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _introCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _scaleAnim = CurvedAnimation(parent: _introCtrl, curve: Curves.easeIn);
+    _fadeAnim =
+        CurvedAnimation(parent: _introCtrl, curve: Curves.easeInOutCubic);
   }
 
   @override
@@ -146,13 +158,8 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
 
     final userMessage = ChatMessage(text: text, isUser: true);
     setState(() {
-      if (_isInitialState) {
-        _messages.clear();
-        _isInitialState = false;
-      }
       _messages.add(userMessage);
     });
-
     _controller.clear();
     _getSkaiResponse(userMessage.text);
     _scrollToBottom();
@@ -190,6 +197,38 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       _isTyping = false;
     });
     _scrollToBottom();
+  }
+
+  // --- Transición de la intro (sphere) al chat ---
+
+  void _startChatTransition({bool addPendingAfter = false}) {
+    if (_isHidingIntro) return;
+    _isHidingIntro = true;
+
+    _introCtrl.forward().whenCompleteOrCancel(() {
+      if (!mounted) return;
+      setState(() {
+        _isInitialState = false;
+      });
+
+      // Si la transición fue gatillada por el primer envío, lo agregamos ahora
+      if (addPendingAfter && _pendingFirstMessage != null) {
+        final first = _pendingFirstMessage!;
+        _pendingFirstMessage = null;
+
+        final userMessage = ChatMessage(text: first, isUser: true);
+        setState(() {
+          _messages.add(userMessage);
+        });
+        _getSkaiResponse(userMessage.text);
+      }
+
+      // Limpia bandera después de terminar
+      _isHidingIntro = false;
+
+      // Asegura scroll al final
+      _scrollToBottom();
+    });
   }
 
   void _scrollToBottom() {
@@ -259,18 +298,94 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
-              ),
+              );
+            },
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ShaderMask(
+                  shaderCallback: (bounds) =>
+                      _brandGradient.createShader(bounds),
+                  child: Text(
+                    'What activity\ndo you want\nto do today?',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white, // necesario para el gradiente
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                // Tap en el sphere dispara la transición
+                GestureDetector(
+                  onTap: () => _startChatTransition(),
+                  child: Hero(
+                    tag: 'skai-sphere-hero',
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/sphere.gif',
+                        width: 250,
+                        height: 250,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                        semanticLabel: 'Animated sphere assistant',
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 40),
-            Image.asset('assets/images/sphere.gif',
-                width: 250, height: 250, fit: BoxFit.cover, gaplessPlayback: true,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  // --- Lista de chat ---
+  Widget _buildChatList() {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        8 + MediaQuery.of(context).viewInsets.bottom, // evita que lo tape el teclado
+      ),
+      itemCount: _messages.length + (_isTyping ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (_isTyping && index == _messages.length) {
+          // “Typing” con sphere pequeño
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+            child: Row(
+              children: [
+                _skaiGifCircle(size: 40),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Opacity(
+                    opacity: 0.7,
+                    child: Container(
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final message = _messages[index];
+        return _buildChatBubble(message);
+      },
+    );
+  }
+
+  // --- Burbujas ---
   Widget _buildChatBubble(ChatMessage message) {
     if (!message.isUser) {
       return Row(
@@ -298,8 +413,8 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
                 style: GoogleFonts.poppins(color: Colors.black87, fontSize: 16),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
@@ -340,6 +455,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
           'assets/images/sphere.gif',
           fit: BoxFit.cover,
           gaplessPlayback: true,
+          semanticLabel: 'Animated sphere assistant',
           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         ),
       ),
@@ -390,6 +506,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
               ),
               child: const Icon(Icons.send, color: Colors.white, size: 22),
             ),
+            child: const Icon(Icons.send, color: Colors.white, size: 22),
           ),
         ],
       ),
