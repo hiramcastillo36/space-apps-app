@@ -2,7 +2,15 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:skai/services/auth_service.dart';
+import 'package:skai/services/conversation_service.dart';
 
+// --- Modelos y Enums ---
 class ChatMessage {
   final String text;
   final bool isUser;
@@ -21,30 +29,59 @@ class SkaiPage extends StatefulWidget {
 
 class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   // 1. DECLARACIÓN DE VARIABLES DE ESTADO
-
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
-  final LinearGradient _brandGradient = LinearGradient(
-    colors: [Colors.pink.shade300, Colors.purple.shade400],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
 
   bool _isInitialState = true;
-  bool _isTyping = false;
-  int _replySession = 0;
   WeatherTheme _currentTheme = WeatherTheme.normal;
 
-  // Controladores de animación declarados como 'late'
+  // Animación de salida del sphere (intro)
+  late final AnimationController _introCtrl;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _fadeAnim;
+  bool _isHidingIntro = false;
+  String? _pendingFirstMessage;
+
+  // Gradiente de marca
+  static const LinearGradient _brandGradient = LinearGradient(
+    colors: [Color(0xFF5B86E5), Color(0xFF9C27B0), Color(0xFFE91E63)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  // Controladores de animación de clima
   late final AnimationController _sunController;
   late final AnimationController _rainController;
+
+  // WebSocket
+  late WebSocketChannel _channel;
+  bool _isConnected = false;
+  StreamSubscription? _subscription;
+  int? _conversationId;
+
+  // Text-to-Speech
+  late FlutterTts _flutterTts;
+  bool _isSpeaking = false;
+
+  // Speech-to-Text
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
 
   // 2. MÉTODOS DE CICLO DE VIDA (initState y dispose)
   @override
   void initState() {
     super.initState();
-    // Inicialización de los controladores de animación
+
+    // Animación intro
+    _introCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _scaleAnim = CurvedAnimation(parent: _introCtrl, curve: Curves.easeIn);
+    _fadeAnim = CurvedAnimation(parent: _introCtrl, curve: Curves.easeInOutCubic);
+
+    // Animaciones de clima
     _sunController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 20),
@@ -55,33 +92,22 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       duration: const Duration(seconds: 2),
     )..repeat();
 
-    _messages.add(
-      ChatMessage(
-        text: "Hola! Soy SkAI, tu asistente de actividades. ¿Qué te gustaría hacer hoy?",
-        isUser: false,
-      ),
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _introCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    );
-    _scaleAnim = CurvedAnimation(parent: _introCtrl, curve: Curves.easeIn);
-    _fadeAnim =
-        CurvedAnimation(parent: _introCtrl, curve: Curves.easeInOutCubic);
+    _initTts();
+    _initSpeech();
+    _createNewConversation();
   }
 
   @override
   void dispose() {
-    // Desechar todos los controladores
-    _controller.dispose();
-    _scrollController.dispose();
+    _introCtrl.dispose();
     _sunController.dispose();
     _rainController.dispose();
+    _flutterTts.stop();
+    _speech.stop();
+    _subscription?.cancel();
+    _channel.sink.close();
+    _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -120,26 +146,8 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
                 children: [
                   Expanded(
                     child: _isInitialState
-                        ? _buildInitialView()
-                        : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      itemCount: _messages.length + (_isTyping ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (_isTyping && index == _messages.length) {
-                          return Align(
-                            alignment: Alignment.centerLeft,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 8.0, horizontal: 4.0),
-                              child: _skaiGifCircle(size: 56),
-                            ),
-                          );
-                        }
-                        final message = _messages[index];
-                        return _buildChatBubble(message);
-                      },
-                    ),
+                        ? _buildAnimatedIntro()
+                        : _buildChatList(),
                   ),
                   SafeArea(top: false, child: _buildInputArea()),
                 ],
@@ -151,55 +159,267 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     );
   }
 
+  // Crear nueva conversación
+  Future<void> _createNewConversation() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        print('No auth token available');
+        return;
+      }
+
+      final conversationResult = await ConversationService.createConversation(
+          'Chat ${DateTime.now().toString().split('.')[0]}'
+      );
+
+      if (!conversationResult['success']) {
+        print('Failed to create conversation: ${conversationResult['error']}');
+        return;
+      }
+
+      _conversationId = ConversationService.getConversationId(conversationResult);
+      if (_conversationId == null) {
+        print('No conversation ID received');
+        return;
+      }
+
+      print('New conversation created with ID: $_conversationId');
+      _connectWebSocket();
+    } catch (e) {
+      print('Error creating conversation: $e');
+    }
+  }
+
+  void _connectWebSocket() async {
+    try {
+      if (_conversationId == null) {
+        print('No conversation ID available');
+        return;
+      }
+
+      final wsUrl = 'ws://20.151.177.103:8080/ws/chat/$_conversationId/';
+
+      _channel = WebSocketChannel.connect(
+        Uri.parse(wsUrl),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isConnected = true;
+      });
+
+      _subscription = _channel.stream.listen(
+            (message) {
+          if (!mounted) return;
+          try {
+            final data = json.decode(message);
+            if (!mounted) return;
+            final responseText = data['message'] ?? message.toString();
+            final mood = data['mood'] as String?;
+
+            setState(() {
+              if (_isInitialState) {
+                _messages.clear();
+                _isInitialState = false;
+              }
+              _messages.add(ChatMessage(
+                text: responseText,
+                isUser: false,
+              ));
+
+              // Detectar tema del clima desde el campo 'mood' o desde el texto
+              if (mood != null) {
+                _setWeatherThemeFromMood(mood);
+              } else {
+                _detectWeatherTheme(responseText);
+              }
+            });
+            _speak(responseText);
+            Timer(const Duration(milliseconds: 100), _scrollToBottom);
+          } catch (e) {
+            if (!mounted) return;
+            final responseText = message.toString();
+            setState(() {
+              _messages.add(ChatMessage(
+                text: responseText,
+                isUser: false,
+              ));
+              _detectWeatherTheme(responseText);
+            });
+            _speak(responseText);
+          }
+        },
+        onError: (error) {
+          if (!mounted) return;
+          setState(() {
+            _isConnected = false;
+          });
+        },
+        onDone: () {
+          if (!mounted) return;
+          setState(() {
+            _isConnected = false;
+          });
+        },
+      );
+    } catch (e) {
+      print('Error WebSocket: $e');
+    }
+  }
+
+  void _initTts() {
+    _flutterTts = FlutterTts();
+    _flutterTts.setLanguage("es-ES");
+    _flutterTts.setSpeechRate(0.5);
+    _flutterTts.setVolume(1.0);
+    _flutterTts.setPitch(1.0);
+
+    _flutterTts.setStartHandler(() {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = true;
+        });
+      }
+    });
+
+    _flutterTts.setCompletionHandler(() {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    });
+
+    _flutterTts.setErrorHandler((msg) {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    });
+  }
+
+  void _initSpeech() async {
+    _speech = stt.SpeechToText();
+    await _speech.initialize(
+      onError: (error) => print('Speech error: $error'),
+      onStatus: (status) => print('Speech status: $status'),
+    );
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+    } else {
+      final available = await _speech.initialize();
+      if (!available) {
+        print('Speech recognition not available');
+        return;
+      }
+
+      setState(() => _isListening = true);
+
+      await _speech.listen(
+        onResult: (result) {
+          if (result.finalResult) {
+            setState(() {
+              _controller.text = result.recognizedWords;
+              _isListening = false;
+            });
+          }
+        },
+        localeId: 'es_ES',
+        cancelOnError: true,
+        listenMode: stt.ListenMode.confirmation,
+      );
+    }
+  }
+
+  Future<void> _speak(String text) async {
+    if (text.isNotEmpty) {
+      await _flutterTts.speak(text);
+    }
+  }
+
+  Future<void> _stopSpeaking() async {
+    await _flutterTts.stop();
+  }
+
+  // Establecer tema del clima desde el campo 'mood' del backend
+  void _setWeatherThemeFromMood(String mood) {
+    WeatherTheme newTheme = WeatherTheme.normal;
+
+    switch (mood.toLowerCase()) {
+      case 'rainy':
+        newTheme = WeatherTheme.rainy;
+        break;
+      case 'sunny':
+        newTheme = WeatherTheme.sunny;
+        break;
+      case 'verysunny':
+      case 'very_sunny':
+        newTheme = WeatherTheme.verySunny;
+        break;
+      case 'normal':
+      default:
+        newTheme = WeatherTheme.normal;
+        break;
+    }
+
+    if (newTheme != _currentTheme) {
+      _currentTheme = newTheme;
+    }
+  }
+
+  // Detectar tema del clima desde la respuesta de texto
+  void _detectWeatherTheme(String text) {
+    final input = text.toLowerCase();
+    WeatherTheme newTheme = WeatherTheme.normal;
+
+    if (input.contains('lluvia') || input.contains('rain') || input.contains('precipitación') ||
+        input.contains('llovizna')) {
+      newTheme = WeatherTheme.rainy;
+    } else if (input.contains('35') || input.contains('muy calor') || input.contains('very hot') ||
+        input.contains('ultra soleado')) {
+      newTheme = WeatherTheme.verySunny;
+    } else if (input.contains('sol') || input.contains('sunny') || input.contains('soleado') ||
+        input.contains('20') || input.contains('25') || input.contains('30')) {
+      newTheme = WeatherTheme.sunny;
+    }
+
+    if (newTheme != _currentTheme) {
+      _currentTheme = newTheme;
+    }
+  }
+
   // 4. MÉTODOS AYUDANTES Y DE LÓGICA
   void _sendMessage() {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || !_isConnected) return;
+
+    FocusScope.of(context).unfocus();
+
+    if (_isInitialState) {
+      _pendingFirstMessage = text;
+      _controller.clear();
+      _startChatTransition(addPendingAfter: true);
+      return;
+    }
 
     final userMessage = ChatMessage(text: text, isUser: true);
     setState(() {
       _messages.add(userMessage);
     });
-    _controller.clear();
-    _getSkaiResponse(userMessage.text);
-    _scrollToBottom();
-  }
 
-  Future<void> _getSkaiResponse(String userInput) async {
-    final int session = ++_replySession;
-    String responseText;
-    final input = userInput.toLowerCase();
-
-    WeatherTheme newTheme = _currentTheme;
-
-    if (input.contains('soccer') || input.contains('jugar')) {
-      responseText =
-      "No te recomiendo jugar ahora, parece que habrá lluvia cerca de las 4 PM. Mejor planea algo en interiores.";
-      newTheme = WeatherTheme.rainy;
-    } else if (input.contains('20') || input.contains('soleado')) {
-      responseText = "Claro, el clima para hoy es soleado con una temperatura de 20°C.";
-      newTheme = WeatherTheme.sunny;
-    } else if (input.contains('35') || input.contains('calor')) {
-      responseText = "¡Sí, hace mucho calor! La temperatura es de 35°C, un día ultra soleado.";
-      newTheme = WeatherTheme.verySunny;
-    } else {
-      responseText = "¡Claro! ¿En qué más te puedo ayudar?";
-      newTheme = WeatherTheme.normal;
-    }
-
-    setState(() => _isTyping = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted || session != _replySession) return;
-
-    setState(() {
-      _messages.add(ChatMessage(text: responseText, isUser: false));
-      _currentTheme = newTheme;
-      _isTyping = false;
+    final jsonMessage = json.encode({
+      'message': text,
     });
+    _channel.sink.add(jsonMessage);
+
+    _controller.clear();
     _scrollToBottom();
   }
-
-  // --- Transición de la intro (sphere) al chat ---
 
   void _startChatTransition({bool addPendingAfter = false}) {
     if (_isHidingIntro) return;
@@ -211,7 +431,6 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
         _isInitialState = false;
       });
 
-      // Si la transición fue gatillada por el primer envío, lo agregamos ahora
       if (addPendingAfter && _pendingFirstMessage != null) {
         final first = _pendingFirstMessage!;
         _pendingFirstMessage = null;
@@ -220,13 +439,14 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
         setState(() {
           _messages.add(userMessage);
         });
-        _getSkaiResponse(userMessage.text);
+
+        final jsonMessage = json.encode({
+          'message': first,
+        });
+        _channel.sink.add(jsonMessage);
       }
 
-      // Limpia bandera después de terminar
       _isHidingIntro = false;
-
-      // Asegura scroll al final
       _scrollToBottom();
     });
   }
@@ -257,93 +477,80 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     }
   }
 
-
-
   // 5. WIDGETS DE UI (BUILDERS)
   Widget _buildWeatherAnimations() {
-    return Stack(
-      children: [
-        AnimatedOpacity(
-          duration: const Duration(milliseconds: 800),
-          opacity: (_currentTheme == WeatherTheme.sunny || _currentTheme == WeatherTheme.verySunny) ? 1.0 : 0.0,
-          child: _SunWidget(
-            controller: _sunController, // SIN '!'
-            isVerySunny: _currentTheme == WeatherTheme.verySunny,
-          ),
-        ),
-        AnimatedOpacity(
-          duration: const Duration(milliseconds: 800),
-          opacity: _currentTheme == WeatherTheme.rainy ? 1.0 : 0.0,
-          child: _RainWidget(controller: _rainController), // SIN '!'
-        ),
-      ],
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          if (_currentTheme == WeatherTheme.sunny || _currentTheme == WeatherTheme.verySunny)
+            _SunWidget(
+              controller: _sunController,
+              isVerySunny: _currentTheme == WeatherTheme.verySunny,
+            ),
+          if (_currentTheme == WeatherTheme.rainy)
+            _RainWidget(controller: _rainController),
+        ],
+      ),
     );
   }
 
 
-  Widget _buildInitialView() {
+  Widget _buildAnimatedIntro() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ShaderMask(
-              shaderCallback: (bounds) => _brandGradient.createShader(bounds),
-              child: Text(
-                'What activity\ndo you want\nto do today?',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+        child: AnimatedBuilder(
+          animation: _introCtrl,
+          builder: (context, child) {
+            final scale = 1.0 - (_scaleAnim.value * 0.6);
+            final opacity = 1.0 - _fadeAnim.value;
+            return Opacity(
+              opacity: opacity.clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: scale.clamp(0.4, 1.0),
+                child: child,
+              ),
+            );
+          },
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) => _brandGradient.createShader(bounds),
+                child: Text(
+                  'What activity\ndo you want\nto do today?',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              );
-            },
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ShaderMask(
-                  shaderCallback: (bounds) =>
-                      _brandGradient.createShader(bounds),
-                  child: Text(
-                    'What activity\ndo you want\nto do today?',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white, // necesario para el gradiente
+              ),
+              const SizedBox(height: 40),
+              GestureDetector(
+                onTap: () => _startChatTransition(),
+                child: Hero(
+                  tag: 'skai-sphere-hero',
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/sphere.gif',
+                      width: 250,
+                      height: 250,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
                 ),
-                const SizedBox(height: 40),
-                // Tap en el sphere dispara la transición
-                GestureDetector(
-                  onTap: () => _startChatTransition(),
-                  child: Hero(
-                    tag: 'skai-sphere-hero',
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/sphere.gif',
-                        width: 250,
-                        height: 250,
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        semanticLabel: 'Animated sphere assistant',
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // --- Lista de chat ---
   Widget _buildChatList() {
     return ListView.builder(
       controller: _scrollController,
@@ -351,41 +558,16 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
         16,
         16,
         16,
-        8 + MediaQuery.of(context).viewInsets.bottom, // evita que lo tape el teclado
+        8 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      itemCount: _messages.length + (_isTyping ? 1 : 0),
+      itemCount: _messages.length,
       itemBuilder: (context, index) {
-        if (_isTyping && index == _messages.length) {
-          // “Typing” con sphere pequeño
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
-            child: Row(
-              children: [
-                _skaiGifCircle(size: 40),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Opacity(
-                    opacity: 0.7,
-                    child: Container(
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
         final message = _messages[index];
         return _buildChatBubble(message);
       },
     );
   }
 
-  // --- Burbujas ---
   Widget _buildChatBubble(ChatMessage message) {
     if (!message.isUser) {
       return Row(
@@ -413,8 +595,8 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
                 style: GoogleFonts.poppins(color: Colors.black87, fontSize: 16),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -455,7 +637,6 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
           'assets/images/sphere.gif',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          semanticLabel: 'Animated sphere assistant',
           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         ),
       ),
@@ -491,22 +672,49 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
                   borderRadius: BorderRadius.all(Radius.circular(30.0)),
                   borderSide: BorderSide(color: Color(0xFF9C27B0), width: 1.2),
                 ),
+                enabled: _isConnected,
               ),
             ),
           ),
-          const SizedBox(width: 8.0),
+          const SizedBox(width: 8),
+          // Botón enviar
           InkWell(
             borderRadius: BorderRadius.circular(24),
             onTap: _sendMessage,
             child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration:  BoxDecoration(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: _brandGradient,
               ),
               child: const Icon(Icons.send, color: Colors.white, size: 22),
             ),
-            child: const Icon(Icons.send, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 8),
+          // Botón micrófono con speech-to-text
+          InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: _toggleListening,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: _isListening
+                    ? const LinearGradient(
+                  colors: [Color(0xFFEF5350), Color(0xFFE91E63)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+                    : _brandGradient,
+              ),
+              child: Icon(
+                _isListening ? Icons.mic : Icons.mic_none,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
           ),
         ],
       ),
@@ -604,22 +812,24 @@ class _SunWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 40,
-      right: 40,
-      child: RotationTransition(
-        turns: controller,
-        child: Icon(
-          Icons.wb_sunny_rounded,
-          color: isVerySunny ? Colors.orangeAccent.shade400.withOpacity(0.8) : Colors.yellow.shade600.withOpacity(0.8),
-          size: isVerySunny ? 120 : 100,
-          shadows: [
-            BoxShadow(
-              color: isVerySunny ? Colors.orange.withOpacity(0.5) : Colors.yellow.withOpacity(0.5),
-              blurRadius: 30,
-              spreadRadius: 10,
-            )
-          ],
+    return Align(
+      alignment: Alignment.topRight,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 40, right: 40),
+        child: RotationTransition(
+          turns: controller,
+          child: Icon(
+            Icons.wb_sunny_rounded,
+            color: isVerySunny ? Colors.orangeAccent.shade400.withOpacity(0.8) : Colors.yellow.shade600.withOpacity(0.8),
+            size: isVerySunny ? 120 : 100,
+            shadows: [
+              BoxShadow(
+                color: isVerySunny ? Colors.orange.withOpacity(0.5) : Colors.yellow.withOpacity(0.5),
+                blurRadius: 30,
+                spreadRadius: 10,
+              )
+            ],
+          ),
         ),
       ),
     );

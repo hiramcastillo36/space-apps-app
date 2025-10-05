@@ -2,33 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:skai/utils/constans.dart';
+// ⬇️ Ajusta la ruta/caso del archivo según tu proyecto (recomendado: auth.dart en minúsculas)
+import 'package:skai/Auth.dart';
+import 'events.dart';
+import 'eventsModel.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  // Gradiente usado en los títulos y ahora en el texto del botón
   static const LinearGradient _titleGradient = LinearGradient(
-    colors: [
-      Color(0xFF5B86E5),
-      Color(0xFF9C27B0),
-      Color(0xFFE91E63),
-    ],
+    colors: [Color(0xFF5B86E5), Color(0xFF9C27B0), Color(0xFFE91E63)],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
 
+  // Helper para pintar texto con gradiente
   Widget _gradientTitle(
     String text, {
     double fontSize = 20,
     FontWeight weight = FontWeight.w600,
+    TextAlign? align,
   }) {
     return ShaderMask(
       shaderCallback: (bounds) => _titleGradient.createShader(bounds),
       child: Text(
         text,
+        textAlign: align,
         style: GoogleFonts.poppins(
           fontSize: fontSize,
           fontWeight: weight,
-          color: Colors.white,
+          color: Colors.white, // requerido para que el Shader pinte el gradiente
         ),
       ),
     );
@@ -59,6 +63,7 @@ class ProfilePage extends StatelessWidget {
                   children: [
                     Center(child: _buildHeader()),
                     const SizedBox(height: 40),
+
                     _buildSectionTitle('Most recent activities'),
                     const SizedBox(height: 20),
                     _buildActivityGrid(const [
@@ -68,6 +73,7 @@ class ProfilePage extends StatelessWidget {
                       FontAwesomeIcons.personBiking,
                     ]),
                     const SizedBox(height: 40),
+
                     _buildSectionTitle('My favorite activities'),
                     const SizedBox(height: 20),
                     _buildActivityGrid(const [
@@ -76,6 +82,12 @@ class ProfilePage extends StatelessWidget {
                       FontAwesomeIcons.personSwimming,
                       FontAwesomeIcons.personBiking,
                     ]),
+                    const SizedBox(height: 48),
+
+                    // ⬇️ Botón Cerrar sesión con texto en gradiente
+                    _buildLogoutButton(context),
+                    const SizedBox(height: 32),
+                    _eventCard(context),
                   ],
                 ),
               ),
@@ -131,6 +143,43 @@ class ProfilePage extends StatelessWidget {
       ),
       child: Center(
         child: FaIcon(icon, size: 28, color: Colors.grey[700]),
+      ),
+    );
+  }
+
+  // ---------- Botón Cerrar sesión ----------
+  Widget _buildLogoutButton(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        // Navega a Auth y reemplaza la pantalla actual
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AuthPage()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+          // Borde suave
+          border: Border.all(color: const Color(0xFFE6E8EE)),
+        ),
+        child: Center(
+          child: _gradientTitle(
+            'Cerrar sesión',
+            fontSize: 18,
+            weight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -200,6 +249,47 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
+Widget _eventCard(BuildContext context) {
+  return InkWell(
+    borderRadius: BorderRadius.circular(15),
+    onTap: () {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) =>  Eventos()),
+      );
+    },
+    child: Container(
+      decoration: BoxDecoration(
+        color: cardBackgroundColor,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FaIcon(FontAwesomeIcons.calendar, size: 28, color: Colors.grey[700]),
+          const SizedBox(width: 12),
+          Text(
+            'Eventos',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
 /// Fondo con semicírculos concéntricos en el lado izquierdo.
 class BackgroundArcs extends StatelessWidget {
   const BackgroundArcs({
@@ -237,6 +327,31 @@ class BackgroundArcs extends StatelessWidget {
   }
 }
 
+final List<Map<String, dynamic>> eventJsonList = [
+  {
+    "id": 1,
+    "user_email": "user@example.com",
+    "conversation_title": "Weather Consultation",
+    "event_name": "Fiesta de cumpleaños",
+    "event_date": "2027-08-29T21:00:00Z",
+    "location_name": "Queretaro",
+    "latitude": 20.58806,
+    "longitude": -100.38806,
+    "weather_data": {
+      "temperature": "25.3 C",
+      "precipitation": "0 mm"
+    },
+    "temperature": null,
+    "precipitation": null,
+    "wind_speed": null,
+    "created_at": "2025-10-05T04:30:08.853633Z",
+    "updated_at": "2025-10-05T04:30:08.853655Z"
+  }
+];
+
+final List<Evento> sampleEvents =
+    eventJsonList.map((json) => Evento.fromJson(json)).toList();
+
 class _ArcsPainter extends CustomPainter {
   _ArcsPainter({
     required this.color,
@@ -272,7 +387,7 @@ class _ArcsPainter extends CustomPainter {
       final r = maxRadius - i * step;
       if (r <= 0) break;
       final rect = Rect.fromCircle(center: center, radius: r);
-      // Semicírculo derecho (abre hacia la derecha): -90° a 90°
+      // Semicírculo derecho (abre hacia la derecha)
       canvas.drawArc(rect, -1.57079632679, 3.14159265359, false, paint);
     }
   }
