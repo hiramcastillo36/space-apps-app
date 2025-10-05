@@ -7,6 +7,7 @@ const Color cardBackgroundColor = Color(0xFFF0F4F8);
 const Color primaryCardColor = Color(0xFF1A237E);
 
 
+
 void showSnackBar(BuildContext context, String texto, int duracion, String titulo, ContentType tipo) {
   // Crea el SnackBar
   final snackBar = SnackBar(
