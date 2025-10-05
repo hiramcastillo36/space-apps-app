@@ -3,6 +3,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_tts/flutter_tts.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -17,11 +18,46 @@ class _ChatScreenState extends State<ChatScreen> {
   late WebSocketChannel _channel;
   bool _isConnected = false;
   StreamSubscription? _subscription;
+  late FlutterTts _flutterTts;
+  bool _isSpeaking = false;
 
   @override
   void initState() {
     super.initState();
+    _initTts();
     _connectWebSocket();
+  }
+
+  void _initTts() {
+    _flutterTts = FlutterTts();
+    _flutterTts.setLanguage("es-ES");
+    _flutterTts.setSpeechRate(0.5);
+    _flutterTts.setVolume(1.0);
+    _flutterTts.setPitch(1.0);
+
+    _flutterTts.setStartHandler(() {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = true;
+        });
+      }
+    });
+
+    _flutterTts.setCompletionHandler(() {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    });
+
+    _flutterTts.setErrorHandler((msg) {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    });
   }
 
   String _getHost() {
@@ -34,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _connectWebSocket() {
     try {
       final host = _getHost();
-      final wsUrl = 'ws://$host:8080/ws/chat/70/';
+      final wsUrl = 'ws://$host:8080/ws/chat/137/';
 
       _channel = WebSocketChannel.connect(
         Uri.parse(wsUrl),
@@ -51,20 +87,26 @@ class _ChatScreenState extends State<ChatScreen> {
           try {
             final data = json.decode(message);
             if (!mounted) return;
+            final responseText = data['message'] ?? message.toString();
             setState(() {
               _messages.add(ChatMessage(
-                text: data['message'] ?? message.toString(),
+                text: responseText,
                 isMe: false,
               ));
             });
+            // Leer respuesta en voz alta
+            _speak(responseText);
           } catch (e) {
             if (!mounted) return;
+            final responseText = message.toString();
             setState(() {
               _messages.add(ChatMessage(
-                text: message.toString(),
+                text: responseText,
                 isMe: false,
               ));
             });
+            // Leer respuesta en voz alta
+            _speak(responseText);
           }
         },
         onError: (error) {
@@ -84,6 +126,16 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       _showError('No se pudo conectar al WebSocket: $e');
     }
+  }
+
+  Future<void> _speak(String text) async {
+    if (text.isNotEmpty) {
+      await _flutterTts.speak(text);
+    }
+  }
+
+  Future<void> _stopSpeaking() async {
+    await _flutterTts.stop();
   }
 
   void _sendMessage() {
@@ -116,6 +168,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _flutterTts.stop();
     _subscription?.cancel();
     _channel.sink.close();
     _controller.dispose();
@@ -128,6 +181,11 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('Chat'),
         actions: [
+          IconButton(
+            icon: Icon(_isSpeaking ? Icons.volume_up : Icons.volume_off),
+            onPressed: _isSpeaking ? _stopSpeaking : null,
+            tooltip: _isSpeaking ? 'Detener audio' : 'Silencio',
+          ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Center(
