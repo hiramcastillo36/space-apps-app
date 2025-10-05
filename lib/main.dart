@@ -4,6 +4,7 @@ import 'package:skai/widgets/navbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:skai/Auth.dart';
 import 'package:skai/widgets/audio.dart';
+import 'package:skai/widgets/voz.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -17,7 +18,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-        home: SpeechToTextExample(),
+        home: const TextToSpeechView(),
     );
   }
 }
