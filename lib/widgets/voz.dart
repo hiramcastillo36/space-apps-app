@@ -23,7 +23,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
       await flutterTts.setLanguage("es-ES");
-      await flutterTts.setPitch(1.0);
+      await flutterTts.setPitch(.45);
       await flutterTts.setSpeechRate(0.5);
       await flutterTts.speak(text);
     }
