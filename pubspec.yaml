@@ -39,6 +39,7 @@ dependencies:
   flutter_svg:
   google_fonts:
   speech_to_text: ^7.3.0
+  flutter_tts: ^3.8.4
 
 
 dev_dependencies:
