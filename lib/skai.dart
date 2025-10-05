@@ -17,7 +17,7 @@ class ChatMessage {
 }
 
 // ACTUALIZADO: Enum con todos los temas de clima
-enum WeatherTheme { normal, sunny, verySunny, rainy, windy, stormy, snowy }
+enum WeatherTheme { normal, sunny, verySunny, rainy, windy, stormy, snowy, cloudy }
 
 // --- Widget Principal ---
 class SkaiPage extends StatefulWidget {
@@ -328,8 +328,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
 
   // --- Lógica de Temas y Mensajes ---
 
+  // ACTUALIZADO: para manejar nuevos moods del backend
   void _setWeatherThemeFromMood(String mood) {
-    WeatherTheme newTheme = WeatherTheme.normal;
+    WeatherTheme newTheme = WeatherTheme.normal; // Default
     switch (mood.toLowerCase()) {
       case 'rainy': newTheme = WeatherTheme.rainy; break;
       case 'sunny': newTheme = WeatherTheme.sunny; break;
@@ -337,53 +338,65 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       case 'windy': newTheme = WeatherTheme.windy; break;
       case 'stormy': newTheme = WeatherTheme.stormy; break;
       case 'snowy': newTheme = WeatherTheme.snowy; break;
-      case 'normal': default: newTheme = WeatherTheme.normal; break;
+      case 'cloudy': newTheme = WeatherTheme.cloudy; break;
+    // Los moods que no son de clima se mapean a 'normal'
+      case 'success':
+      case 'loading':
+      case 'neutral':
+      default:
+        newTheme = WeatherTheme.normal; break;
     }
     if (newTheme != _currentTheme) setState(() => _currentTheme = newTheme);
   }
 
-  // CORREGIDO Y MEJORADO: Lógica de detección de clima mucho más robusta
+  // ACTUALIZADO: para detectar nuevas palabras clave
   void _detectWeatherTheme(String text) {
     final input = text.toLowerCase();
-    WeatherTheme newTheme = _currentTheme; // Empezamos con el tema actual para no cambiarlo si no se detecta nada
+    WeatherTheme newTheme = _currentTheme;
 
-    final RegExp numberRegex = RegExp(r'(-?\d+(\.\d+)?)');
-    final Match? numberMatch = numberRegex.firstMatch(input);
-
-    double? temperature;
-    if (numberMatch != null) {
-      temperature = double.tryParse(numberMatch.group(0)!);
-    }
-
-    if (input.contains('tormenta') || input.contains('storm')) {
+    // --- Lógica de decisión con prioridades ---
+    // 1. Palabras clave de alta prioridad que anulan todo lo demás
+    if (input.contains('tormenta') || input.contains('vendaval') || input.contains('⛈') || input.contains('peligro')) {
       newTheme = WeatherTheme.stormy;
     }
-    else if (input.contains('nieve') || input.contains('snow')) {
-      newTheme = WeatherTheme.snowy;
-    }
-    else if (input.contains('viento') || input.contains('windy')) {
-      newTheme = WeatherTheme.windy;
-    }
-    else if ((input.contains('lluvia') || input.contains('rain')) &&
-        !(input.contains('sin') || input.contains('no hay') || input.contains('poca probabilidad'))) {
-      newTheme = WeatherTheme.rainy;
-    }
-    else if (temperature != null) {
-      if (temperature <= 0) {
-        newTheme = WeatherTheme.snowy;
-      } else if (temperature >= 30) {
-        newTheme = WeatherTheme.verySunny;
-      } else if (temperature >= 18) {
+    // 2. Comprobar negaciones antes que las afirmaciones
+    else if (input.contains('sin') || input.contains('no hay') || input.contains('poca probabilidad')) {
+      // Si dice "sin lluvia", es probable que esté soleado o normal.
+      if (input.contains('sol') || input.contains('despejado')) {
         newTheme = WeatherTheme.sunny;
       } else {
         newTheme = WeatherTheme.normal;
       }
     }
-    else if (input.contains('ultra soleado') || input.contains('mucho calor')) {
-      newTheme = WeatherTheme.verySunny;
+    // 3. Comprobar condiciones climáticas afirmativas
+    else if (input.contains('lluvia') || input.contains('llover') || input.contains('precipitación') || input.contains('mojado') || input.contains('🌧') || input.contains('paraguas')) {
+      newTheme = WeatherTheme.rainy;
     }
-    else if (input.contains('sol') || input.contains('soleado')) {
+    else if (input.contains('viento fuerte') || input.contains('ráfagas') || input.contains('viento')) {
+      newTheme = WeatherTheme.windy;
+    }
+    else if (input.contains('nieve') || input.contains('snow')) {
+      newTheme = WeatherTheme.snowy;
+    }
+    else if (input.contains('nublado') || input.contains('nubes') || input.contains('cubierto') || input.contains('gris') || input.contains('☁')) {
+      newTheme = WeatherTheme.cloudy;
+    }
+    else if (input.contains('soleado') || input.contains('despejado') || input.contains('perfecto') || input.contains('excelente') || input.contains('ideal') || input.contains('☀') || input.contains('sol')) {
       newTheme = WeatherTheme.sunny;
+    }
+    // 4. Fallback a la temperatura si no se encontraron palabras clave
+    else {
+      final RegExp numberRegex = RegExp(r'(-?\d+(\.\d+)?)');
+      final Match? numberMatch = numberRegex.firstMatch(input);
+      if (numberMatch != null) {
+        double? temperature = double.tryParse(numberMatch.group(0)!);
+        if (temperature != null) {
+          if (temperature <= 0) newTheme = WeatherTheme.snowy;
+          else if (temperature >= 30) newTheme = WeatherTheme.verySunny;
+          else if (temperature >= 18) newTheme = WeatherTheme.sunny;
+          else newTheme = WeatherTheme.normal;
+        }
+      }
     }
 
     if (newTheme != _currentTheme) {
@@ -444,6 +457,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     });
   }
 
+  // ACTUALIZADO: para manejar los nuevos gradientes
   LinearGradient _getCurrentGradient() {
     switch (_currentTheme) {
       case WeatherTheme.sunny: return LinearGradient(colors: [Colors.lightBlue.shade200, Colors.yellow.shade400], begin: Alignment.topLeft, end: Alignment.bottomRight);
@@ -452,12 +466,14 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       case WeatherTheme.windy: return LinearGradient(colors: [Colors.blueGrey.shade200, Colors.lightBlue.shade100], begin: Alignment.topLeft, end: Alignment.bottomRight);
       case WeatherTheme.stormy: return LinearGradient(colors: [Colors.indigo.shade900, Colors.blueGrey.shade800], begin: Alignment.topLeft, end: Alignment.bottomRight);
       case WeatherTheme.snowy: return LinearGradient(colors: [Colors.lightBlue.shade100, Colors.grey.shade300], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.cloudy: return LinearGradient(colors: [Colors.blueGrey.shade300, Colors.grey.shade500], begin: Alignment.topLeft, end: Alignment.bottomRight);
       case WeatherTheme.normal: default: return LinearGradient(colors: [Colors.lightBlue.shade100, Colors.pink.shade100], begin: Alignment.topLeft, end: Alignment.bottomRight);
     }
   }
 
   // --- Widgets de UI (BUILDERS) ---
 
+  // ACTUALIZADO: para mostrar todas las animaciones
   Widget _buildWeatherAnimations() {
     return IgnorePointer(
       child: Stack(
@@ -1108,4 +1124,3 @@ class _Snowflake {
   final double speed = math.Random().nextDouble() * 0.1 + 0.05;
   final double opacity = math.Random().nextDouble() * 0.7 + 0.3;
 }
-

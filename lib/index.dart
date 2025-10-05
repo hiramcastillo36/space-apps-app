@@ -9,8 +9,6 @@ import 'package:skai/utils/constans.dart';
 class Index extends StatelessWidget {
   const Index({super.key, this.onOpenSkai});
 
-  /// Callback que permite al contenedor (tu NavigationShell) cambiar de tab.
-  /// Si es null, se hace un Navigator.push a SkaiPage como respaldo.
   final VoidCallback? onOpenSkai;
 
   @override
