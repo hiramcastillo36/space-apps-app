@@ -3,6 +3,7 @@ import 'package:skai/profile.dart';
 import 'package:skai/index.dart';
 import 'package:skai/widgets/navbar.dart';
 import 'package:skai/skai.dart';
+import 'package:skai/events.dart';
 
 class NavigationShell extends StatefulWidget {
   const NavigationShell({super.key});

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:skai/utils/constans.dart';
+import 'events.dart';
+import 'eventsModel.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -50,7 +52,6 @@ class ProfilePage extends StatelessWidget {
                 alignment: Alignment.centerLeft,
               ),
             ),
-            // Contenido
             SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
@@ -76,6 +77,8 @@ class ProfilePage extends StatelessWidget {
                       FontAwesomeIcons.personSwimming,
                       FontAwesomeIcons.personBiking,
                     ]),
+                    const SizedBox(height: 32),
+                    _eventCard(context),
                   ],
                 ),
               ),
@@ -200,6 +203,47 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
+Widget _eventCard(BuildContext context) {
+  return InkWell(
+    borderRadius: BorderRadius.circular(15),
+    onTap: () {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) =>  Eventos()),
+      );
+    },
+    child: Container(
+      decoration: BoxDecoration(
+        color: cardBackgroundColor,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FaIcon(FontAwesomeIcons.calendar, size: 28, color: Colors.grey[700]),
+          const SizedBox(width: 12),
+          Text(
+            'Eventos',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
 /// Fondo con semicírculos concéntricos en el lado izquierdo.
 class BackgroundArcs extends StatelessWidget {
   const BackgroundArcs({
@@ -236,6 +280,31 @@ class BackgroundArcs extends StatelessWidget {
     );
   }
 }
+
+final List<Map<String, dynamic>> eventJsonList = [
+  {
+    "id": 1,
+    "user_email": "user@example.com",
+    "conversation_title": "Weather Consultation",
+    "event_name": "Fiesta de cumpleaños",
+    "event_date": "2027-08-29T21:00:00Z",
+    "location_name": "Queretaro",
+    "latitude": 20.58806,
+    "longitude": -100.38806,
+    "weather_data": {
+      "temperature": "25.3 C",
+      "precipitation": "0 mm"
+    },
+    "temperature": null,
+    "precipitation": null,
+    "wind_speed": null,
+    "created_at": "2025-10-05T04:30:08.853633Z",
+    "updated_at": "2025-10-05T04:30:08.853655Z"
+  }
+];
+
+final List<Evento> sampleEvents =
+    eventJsonList.map((json) => Evento.fromJson(json)).toList();
 
 class _ArcsPainter extends CustomPainter {
   _ArcsPainter({
