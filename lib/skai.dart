@@ -1,6 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 // Modelo de mensaje
 class ChatMessage {
@@ -40,6 +46,19 @@ class _SkaiPageState extends State<SkaiPage>
     end: Alignment.centerRight,
   );
 
+  // WebSocket
+  late WebSocketChannel _channel;
+  bool _isConnected = false;
+  StreamSubscription? _subscription;
+
+  // Text-to-Speech
+  late FlutterTts _flutterTts;
+  bool _isSpeaking = false;
+
+  // Speech-to-Text
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+
   @override
   void initState() {
     super.initState();
@@ -50,23 +69,127 @@ class _SkaiPageState extends State<SkaiPage>
     _scaleAnim = CurvedAnimation(parent: _introCtrl, curve: Curves.easeIn);
     _fadeAnim =
         CurvedAnimation(parent: _introCtrl, curve: Curves.easeInOutCubic);
+    _initTts();
+    _initSpeech();
+    _connectWebSocket();
   }
 
-  @override
-  void dispose() {
-    _introCtrl.dispose();
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  void _connectWebSocket() {
+    try {
+      final wsUrl = 'ws://20.151.177.103:8080/ws/chat/1/';
+
+      _channel = WebSocketChannel.connect(
+        Uri.parse(wsUrl),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isConnected = true;
+      });
+
+      _subscription = _channel.stream.listen(
+        (message) {
+          if (!mounted) return;
+          try {
+            final data = json.decode(message);
+            if (!mounted) return;
+            final responseText = data['message'] ?? message.toString();
+            setState(() {
+              if (_isInitialState) {
+                _messages.clear();
+                _isInitialState = false;
+              }
+              _messages.add(ChatMessage(
+                text: responseText,
+                isUser: false,
+              ));
+            });
+            _speak(responseText);
+            Timer(const Duration(milliseconds: 100), _scrollToBottom);
+          } catch (e) {
+            if (!mounted) return;
+            final responseText = message.toString();
+            setState(() {
+              _messages.add(ChatMessage(
+                text: responseText,
+                isUser: false,
+              ));
+            });
+            _speak(responseText);
+          }
+        },
+        onError: (error) {
+          if (!mounted) return;
+          setState(() {
+            _isConnected = false;
+          });
+        },
+        onDone: () {
+          if (!mounted) return;
+          setState(() {
+            _isConnected = false;
+          });
+        },
+      );
+    } catch (e) {
+      print('Error WebSocket: $e');
+    }
+  }
+
+  void _initTts() {
+    _flutterTts = FlutterTts();
+    _flutterTts.setLanguage("es-ES");
+    _flutterTts.setSpeechRate(0.5);
+    _flutterTts.setVolume(1.0);
+    _flutterTts.setPitch(1.0);
+
+    _flutterTts.setStartHandler(() {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = true;
+        });
+      }
+    });
+
+    _flutterTts.setCompletionHandler(() {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    });
+
+    _flutterTts.setErrorHandler((msg) {
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    });
+  }
+
+  void _initSpeech() {
+    _speech = stt.SpeechToText();
+  }
+
+  Future<void> _speak(String text) async {
+    if (text.isNotEmpty) {
+      await _flutterTts.speak(text);
+    }
+  }
+
+  Future<void> _stopSpeaking() async {
+    await _flutterTts.stop();
   }
 
   // --- Envío de mensajes ---
 
   void _sendMessage() {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || !_isConnected) return;
 
     FocusScope.of(context).unfocus();
+    final message = _controller.text;
 
     if (_isInitialState) {
       // Si todavía estamos en la intro, primero ocultamos con animación
@@ -81,6 +204,13 @@ class _SkaiPageState extends State<SkaiPage>
     setState(() {
       _messages.add(userMessage);
     });
+
+    // Enviar mensaje por WebSocket
+    final jsonMessage = json.encode({
+      'message': message,
+    });
+    _channel.sink.add(jsonMessage);
+
     _controller.clear();
 
     _getSkaiResponse(userMessage.text);
@@ -173,6 +303,18 @@ class _SkaiPageState extends State<SkaiPage>
   }
 
   // --- UI ---
+
+  @override
+  void dispose() {
+    _introCtrl.dispose();
+    _flutterTts.stop();
+    _speech.stop();
+    _subscription?.cancel();
+    _channel.sink.close();
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -462,6 +604,7 @@ Widget _buildInputArea() {
                 borderRadius: BorderRadius.all(Radius.circular(30.0)),
                 borderSide: BorderSide(color: Color(0xFF9C27B0), width: 1.2),
               ),
+              enabled: _isConnected,
             ),
           ),
         ),

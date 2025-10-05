@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:skai/utils/constans.dart';
+import 'package:skai/chat_screen.dart';
 import 'package:skai/skai.dart';
 import 'package:skai/utils/constans.dart';
 

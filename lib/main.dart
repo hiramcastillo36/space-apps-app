@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:skai/index.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:skai/Auth.dart';
+import 'package:skai/profile.dart';
+import 'package:skai/widgets/navbar.dart';
+import 'package:skai/widgets/navigation_shell.dart';
+
 import 'package:skai/widgets/audio.dart';
 import 'package:skai/widgets/voz.dart';
 import 'package:skai/widgets/navigation_shell.dart';
