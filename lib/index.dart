@@ -30,7 +30,6 @@ class Index extends StatelessWidget {
           ),
         ),
       ),
-      //bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
