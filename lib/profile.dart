@@ -6,79 +6,104 @@ import 'package:skai/utils/constans.dart';
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  // Gradiente reutilizable (mismo que en Index)
+  static const LinearGradient _titleGradient = LinearGradient(
+    colors: [
+      Color(0xFF5B86E5), // azul
+      Color(0xFF9C27B0), // violeta
+      Color(0xFFE91E63), // rosa
+    ],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  // Helper para texto con gradiente
+  Widget _gradientTitle(
+    String text, {
+    double fontSize = 20,
+    FontWeight weight = FontWeight.w600,
+  }) {
+    return ShaderMask(
+      shaderCallback: (bounds) => _titleGradient.createShader(bounds),
+      child: Text(
+        text,
+        style: GoogleFonts.poppins(
+          fontSize: fontSize,
+          fontWeight: weight,
+          color: Colors.white, // necesario para que el Shader pinte
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
-            child: Column(
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 40),
-                _buildSectionTitle('Most recent activities'),
-                const SizedBox(height: 20),
-                _buildActivityGrid([
-                  FontAwesomeIcons.personRunning,
-                  FontAwesomeIcons.mountain,
-                  FontAwesomeIcons.personSwimming,
-                  FontAwesomeIcons.personBiking,
-                ]),
-                const SizedBox(height: 40),
-                _buildSectionTitle('My favorite activities'),
-                const SizedBox(height: 20),
-                _buildActivityGrid([
-                  FontAwesomeIcons.personRunning,
-                  FontAwesomeIcons.mountain,
-                  FontAwesomeIcons.personSwimming,
-                  FontAwesomeIcons.personBiking,
-                ]),
-              ],
+        child: Stack(
+          children: [
+            // Fondo con semicírculos
+            const Positioned.fill(
+              child: BackgroundArcs(
+                color: Color(0xFFEDEFF3), // gris claro
+                stroke: 12,
+                gap: 12,
+                maxCoverage: 0.78,
+                alignment: Alignment.topLeft,
+              ),
             ),
-          ),
+            // Contenido
+            SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, // títulos a la izquierda
+                  children: [
+                    Center(child: _buildHeader()), // header centrado
+                    const SizedBox(height: 40),
+                    _buildSectionTitle('Most recent activities'),
+                    const SizedBox(height: 20),
+                    _buildActivityGrid(const [
+                      FontAwesomeIcons.personRunning,
+                      FontAwesomeIcons.mountain,
+                      FontAwesomeIcons.personSwimming,
+                      FontAwesomeIcons.personBiking,
+                    ]),
+                    const SizedBox(height: 40),
+                    _buildSectionTitle('My favorite activities'),
+                    const SizedBox(height: 20),
+                    _buildActivityGrid(const [
+                      FontAwesomeIcons.personRunning,
+                      FontAwesomeIcons.mountain,
+                      FontAwesomeIcons.personSwimming,
+                      FontAwesomeIcons.personBiking,
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
-  // --- Widgets Separados para Claridad ---
+  // --- Widgets ---
 
   Widget _buildHeader() {
     return Column(
       children: [
-        const Icon(
-          Icons.person,
-          size: 100,
-          color: Colors.grey,
-        ),
+        const Icon(Icons.person, size: 100, color: Colors.grey),
         const SizedBox(height: 16),
-        Text(
-          'Chino',
-          style: GoogleFonts.poppins(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            foreground: Paint()
-              ..shader = const LinearGradient(
-                colors: <Color>[Color(0xFFCE93D8), Color(0xFF81D4FA)],
-              ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
-          ),
-        ),
+        _gradientTitle('Chino', fontSize: 28, weight: FontWeight.bold),
       ],
     );
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.poppins(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        color: primaryTextColor,
-      ),
-    );
+    return _gradientTitle(title, fontSize: 18, weight: FontWeight.w600);
   }
 
   Widget _buildActivityGrid(List<IconData> icons) {
@@ -91,9 +116,7 @@ class ProfilePage extends StatelessWidget {
       itemCount: icons.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemBuilder: (context, index) {
-        return _buildActivityIcon(icons[index]);
-      },
+      itemBuilder: (context, index) => _buildActivityIcon(icons[index]),
     );
   }
 
@@ -111,18 +134,12 @@ class ProfilePage extends StatelessWidget {
         ],
       ),
       child: Center(
-        child: FaIcon(
-          icon,
-          size: 28,
-          color: Colors.grey[700],
-        ),
+        child: FaIcon(icon, size: 28, color: Colors.grey[700]),
       ),
     );
   }
 
   Widget _buildBottomNavBar() {
-    // Este es un duplicado de la barra de navegación de la página de inicio
-    // para mantener la consistencia. En una app real, esto sería un widget reutilizable.
     return Container(
       height: 80,
       decoration: BoxDecoration(
@@ -181,14 +198,90 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          'SkAI',
-          style: GoogleFonts.poppins(
-            color: Colors.grey,
-            fontSize: 12,
-          ),
-        )
+        Text('SkAI', style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
       ],
     );
   }
+}
+
+/// Fondo con semicírculos concéntricos en el lado izquierdo.
+class BackgroundArcs extends StatelessWidget {
+  const BackgroundArcs({
+    super.key,
+    this.color = const Color(0xFFE9EDF2),
+    this.stroke = 12.0,
+    this.gap = 12.0,
+    this.maxCoverage = 0.75,
+    this.alignment = Alignment.centerLeft,
+  });
+
+  final Color color;
+  final double stroke;
+  final double gap;
+  final double maxCoverage;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        return CustomPaint(
+          size: size,
+          painter: _ArcsPainter(
+            color: color,
+            stroke: stroke,
+            gap: gap,
+            maxCoverage: maxCoverage,
+            alignment: alignment,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ArcsPainter extends CustomPainter {
+  _ArcsPainter({
+    required this.color,
+    required this.stroke,
+    required this.gap,
+    required this.maxCoverage,
+    required this.alignment,
+  });
+
+  final Color color;
+  final double stroke;
+  final double gap;
+  final double maxCoverage;
+  final Alignment alignment;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..isAntiAlias = true
+      ..strokeCap = StrokeCap.round;
+
+    // Centro a la izquierda; ajusta vertical con alignment.y (-1 arriba, 0 centro, 1 abajo)
+    final centerY = (alignment.y + 1) / 2 * size.height;
+    final center = Offset(0, centerY);
+
+    final maxRadius = size.width * maxCoverage;
+    final step = stroke + gap;
+    final count = (maxRadius / step).floor();
+
+    for (int i = 0; i < count; i++) {
+      final r = maxRadius - i * step;
+      if (r <= 0) break;
+      final rect = Rect.fromCircle(center: center, radius: r);
+      // Semicírculo derecho (abre hacia la derecha): -90° a 90°
+      canvas.drawArc(rect, -1.57079632679, 3.14159265359, false, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
