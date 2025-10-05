@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:skai/services/auth_service.dart';
@@ -17,7 +16,8 @@ class ChatMessage {
   ChatMessage({required this.text, required this.isUser});
 }
 
-enum WeatherTheme { normal, sunny, verySunny, rainy }
+// ACTUALIZADO: Enum con todos los temas de clima
+enum WeatherTheme { normal, sunny, verySunny, rainy, windy, stormy, snowy }
 
 // --- Widget Principal ---
 class SkaiPage extends StatefulWidget {
@@ -50,9 +50,12 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     end: Alignment.centerRight,
   );
 
-  // Controladores de animación de clima
+  // ACTUALIZADO: Todos los controladores de animación
   late final AnimationController _sunController;
   late final AnimationController _rainController;
+  late final AnimationController _windController;
+  late final AnimationController _stormController;
+  late final AnimationController _snowController;
 
   // WebSocket
   late WebSocketChannel _channel;
@@ -81,16 +84,12 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     _scaleAnim = CurvedAnimation(parent: _introCtrl, curve: Curves.easeIn);
     _fadeAnim = CurvedAnimation(parent: _introCtrl, curve: Curves.easeInOutCubic);
 
-    // Animaciones de clima
-    _sunController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 20),
-    )..repeat();
-
-    _rainController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
+    // ACTUALIZADO: Inicializar todos los controladores de clima
+    _sunController = AnimationController(vsync: this, duration: const Duration(seconds: 20))..repeat();
+    _rainController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _windController = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat();
+    _snowController = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+    _stormController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
 
     _initTts();
     _initSpeech();
@@ -102,6 +101,11 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     _introCtrl.dispose();
     _sunController.dispose();
     _rainController.dispose();
+    // ACTUALIZADO: Desechar los nuevos controladores
+    _windController.dispose();
+    _stormController.dispose();
+    _snowController.dispose();
+
     _flutterTts.stop();
     _speech.stop();
     _subscription?.cancel();
@@ -159,7 +163,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     );
   }
 
-  // Crear nueva conversación
+  // --- Lógica de Conexión y Voz (sin cambios) ---
   Future<void> _createNewConversation() async {
     try {
       final token = await AuthService.getToken();
@@ -227,7 +231,6 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
                 isUser: false,
               ));
 
-              // Detectar tema del clima desde el campo 'mood' o desde el texto
               if (mood != null) {
                 _setWeatherThemeFromMood(mood);
               } else {
@@ -275,27 +278,13 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     _flutterTts.setPitch(1.0);
 
     _flutterTts.setStartHandler(() {
-      if (mounted) {
-        setState(() {
-          _isSpeaking = true;
-        });
-      }
+      if (mounted) setState(() => _isSpeaking = true);
     });
-
     _flutterTts.setCompletionHandler(() {
-      if (mounted) {
-        setState(() {
-          _isSpeaking = false;
-        });
-      }
+      if (mounted) setState(() => _isSpeaking = false);
     });
-
     _flutterTts.setErrorHandler((msg) {
-      if (mounted) {
-        setState(() {
-          _isSpeaking = false;
-        });
-      }
+      if (mounted) setState(() => _isSpeaking = false);
     });
   }
 
@@ -313,10 +302,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       setState(() => _isListening = false);
     } else {
       final available = await _speech.initialize();
-      if (!available) {
-        print('Speech recognition not available');
-        return;
-      }
+      if (!available) return;
 
       setState(() => _isListening = true);
 
@@ -337,67 +323,77 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   }
 
   Future<void> _speak(String text) async {
-    if (text.isNotEmpty) {
-      await _flutterTts.speak(text);
-    }
+    if (text.isNotEmpty) await _flutterTts.speak(text);
   }
 
-  Future<void> _stopSpeaking() async {
-    await _flutterTts.stop();
-  }
+  // --- Lógica de Temas y Mensajes ---
 
-  // Establecer tema del clima desde el campo 'mood' del backend
   void _setWeatherThemeFromMood(String mood) {
     WeatherTheme newTheme = WeatherTheme.normal;
-
     switch (mood.toLowerCase()) {
-      case 'rainy':
-        newTheme = WeatherTheme.rainy;
-        break;
-      case 'sunny':
-        newTheme = WeatherTheme.sunny;
-        break;
-      case 'verysunny':
-      case 'very_sunny':
-        newTheme = WeatherTheme.verySunny;
-        break;
-      case 'normal':
-      default:
-        newTheme = WeatherTheme.normal;
-        break;
+      case 'rainy': newTheme = WeatherTheme.rainy; break;
+      case 'sunny': newTheme = WeatherTheme.sunny; break;
+      case 'verysunny': case 'very_sunny': newTheme = WeatherTheme.verySunny; break;
+      case 'windy': newTheme = WeatherTheme.windy; break;
+      case 'stormy': newTheme = WeatherTheme.stormy; break;
+      case 'snowy': newTheme = WeatherTheme.snowy; break;
+      case 'normal': default: newTheme = WeatherTheme.normal; break;
     }
-
-    if (newTheme != _currentTheme) {
-      _currentTheme = newTheme;
-    }
+    if (newTheme != _currentTheme) setState(() => _currentTheme = newTheme);
   }
 
-  // Detectar tema del clima desde la respuesta de texto
+  // CORREGIDO Y MEJORADO: Lógica de detección de clima mucho más robusta
   void _detectWeatherTheme(String text) {
     final input = text.toLowerCase();
-    WeatherTheme newTheme = WeatherTheme.normal;
+    WeatherTheme newTheme = _currentTheme; // Empezamos con el tema actual para no cambiarlo si no se detecta nada
 
-    if (input.contains('lluvia') || input.contains('rain') || input.contains('precipitación') ||
-        input.contains('llovizna')) {
+    final RegExp numberRegex = RegExp(r'(-?\d+(\.\d+)?)');
+    final Match? numberMatch = numberRegex.firstMatch(input);
+
+    double? temperature;
+    if (numberMatch != null) {
+      temperature = double.tryParse(numberMatch.group(0)!);
+    }
+
+    if (input.contains('tormenta') || input.contains('storm')) {
+      newTheme = WeatherTheme.stormy;
+    }
+    else if (input.contains('nieve') || input.contains('snow')) {
+      newTheme = WeatherTheme.snowy;
+    }
+    else if (input.contains('viento') || input.contains('windy')) {
+      newTheme = WeatherTheme.windy;
+    }
+    else if ((input.contains('lluvia') || input.contains('rain')) &&
+        !(input.contains('sin') || input.contains('no hay') || input.contains('poca probabilidad'))) {
       newTheme = WeatherTheme.rainy;
-    } else if (input.contains('35') || input.contains('muy calor') || input.contains('very hot') ||
-        input.contains('ultra soleado')) {
+    }
+    else if (temperature != null) {
+      if (temperature <= 0) {
+        newTheme = WeatherTheme.snowy;
+      } else if (temperature >= 30) {
+        newTheme = WeatherTheme.verySunny;
+      } else if (temperature >= 18) {
+        newTheme = WeatherTheme.sunny;
+      } else {
+        newTheme = WeatherTheme.normal;
+      }
+    }
+    else if (input.contains('ultra soleado') || input.contains('mucho calor')) {
       newTheme = WeatherTheme.verySunny;
-    } else if (input.contains('sol') || input.contains('sunny') || input.contains('soleado') ||
-        input.contains('20') || input.contains('25') || input.contains('30')) {
+    }
+    else if (input.contains('sol') || input.contains('soleado')) {
       newTheme = WeatherTheme.sunny;
     }
 
     if (newTheme != _currentTheme) {
-      _currentTheme = newTheme;
+      setState(() => _currentTheme = newTheme);
     }
   }
 
-  // 4. MÉTODOS AYUDANTES Y DE LÓGICA
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty || !_isConnected) return;
-
     FocusScope.of(context).unfocus();
 
     if (_isInitialState) {
@@ -408,15 +404,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     }
 
     final userMessage = ChatMessage(text: text, isUser: true);
-    setState(() {
-      _messages.add(userMessage);
-    });
+    setState(() => _messages.add(userMessage));
 
-    final jsonMessage = json.encode({
-      'message': text,
-    });
-    _channel.sink.add(jsonMessage);
-
+    _channel.sink.add(json.encode({'message': text}));
     _controller.clear();
     _scrollToBottom();
   }
@@ -427,23 +417,14 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
 
     _introCtrl.forward().whenCompleteOrCancel(() {
       if (!mounted) return;
-      setState(() {
-        _isInitialState = false;
-      });
+      setState(() => _isInitialState = false);
 
       if (addPendingAfter && _pendingFirstMessage != null) {
         final first = _pendingFirstMessage!;
         _pendingFirstMessage = null;
-
         final userMessage = ChatMessage(text: first, isUser: true);
-        setState(() {
-          _messages.add(userMessage);
-        });
-
-        final jsonMessage = json.encode({
-          'message': first,
-        });
-        _channel.sink.add(jsonMessage);
+        setState(() => _messages.add(userMessage));
+        _channel.sink.add(json.encode({'message': first}));
       }
 
       _isHidingIntro = false;
@@ -465,37 +446,54 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
 
   LinearGradient _getCurrentGradient() {
     switch (_currentTheme) {
-      case WeatherTheme.sunny:
-        return LinearGradient(colors: [Colors.lightBlue.shade200, Colors.yellow.shade400], begin: Alignment.topLeft, end: Alignment.bottomRight);
-      case WeatherTheme.verySunny:
-        return LinearGradient(colors: [Colors.yellow.shade500, Colors.orange.shade700], begin: Alignment.topLeft, end: Alignment.bottomRight);
-      case WeatherTheme.rainy:
-        return LinearGradient(colors: [Colors.blueGrey.shade700, Colors.grey.shade500], begin: Alignment.topLeft, end: Alignment.bottomRight);
-      case WeatherTheme.normal:
-      default:
-        return LinearGradient(colors: [Colors.lightBlue.shade100, Colors.pink.shade100], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.sunny: return LinearGradient(colors: [Colors.lightBlue.shade200, Colors.yellow.shade400], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.verySunny: return LinearGradient(colors: [Colors.yellow.shade500, Colors.orange.shade700], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.rainy: return LinearGradient(colors: [Colors.blueGrey.shade700, Colors.grey.shade500], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.windy: return LinearGradient(colors: [Colors.blueGrey.shade200, Colors.lightBlue.shade100], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.stormy: return LinearGradient(colors: [Colors.indigo.shade900, Colors.blueGrey.shade800], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.snowy: return LinearGradient(colors: [Colors.lightBlue.shade100, Colors.grey.shade300], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.normal: default: return LinearGradient(colors: [Colors.lightBlue.shade100, Colors.pink.shade100], begin: Alignment.topLeft, end: Alignment.bottomRight);
     }
   }
 
-  // 5. WIDGETS DE UI (BUILDERS)
+  // --- Widgets de UI (BUILDERS) ---
+
   Widget _buildWeatherAnimations() {
     return IgnorePointer(
       child: Stack(
         children: [
-          if (_currentTheme == WeatherTheme.sunny || _currentTheme == WeatherTheme.verySunny)
-            _SunWidget(
-              controller: _sunController,
-              isVerySunny: _currentTheme == WeatherTheme.verySunny,
-            ),
-          if (_currentTheme == WeatherTheme.rainy)
-            _RainWidget(controller: _rainController),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 800),
+            opacity: (_currentTheme == WeatherTheme.sunny || _currentTheme == WeatherTheme.verySunny) ? 1.0 : 0.0,
+            child: _SunWidget(controller: _sunController!, isVerySunny: _currentTheme == WeatherTheme.verySunny),
+          ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 800),
+            opacity: (_currentTheme == WeatherTheme.rainy || _currentTheme == WeatherTheme.stormy) ? 1.0 : 0.0,
+            child: _RainWidget(controller: _rainController!),
+          ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 800),
+            opacity: _currentTheme == WeatherTheme.windy ? 1.0 : 0.0,
+            child: _WindWidget(controller: _windController!),
+          ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 800),
+            opacity: _currentTheme == WeatherTheme.stormy ? 1.0 : 0.0,
+            child: _StormWidget(controller: _stormController!),
+          ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 800),
+            opacity: _currentTheme == WeatherTheme.snowy ? 1.0 : 0.0,
+            child: _SnowWidget(controller: _snowController!),
+          ),
         ],
       ),
     );
   }
 
-
   Widget _buildAnimatedIntro() {
+    // ... (sin cambios)
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -552,6 +550,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   }
 
   Widget _buildChatList() {
+    // ... (sin cambios)
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.fromLTRB(
@@ -569,6 +568,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   }
 
   Widget _buildChatBubble(ChatMessage message) {
+    // ... (sin cambios)
     if (!message.isUser) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,7 +599,6 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
         ],
       );
     }
-
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -625,6 +624,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   }
 
   Widget _skaiGifCircle({double size = 56}) {
+    // ... (sin cambios)
     return Container(
       width: size,
       height: size,
@@ -644,6 +644,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   }
 
   Widget _buildInputArea() {
+    // ... (sin cambios)
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: Row(
@@ -677,7 +678,6 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(width: 8),
-          // Botón enviar
           InkWell(
             borderRadius: BorderRadius.circular(24),
             onTap: _sendMessage,
@@ -692,7 +692,6 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(width: 8),
-          // Botón micrófono con speech-to-text
           InkWell(
             borderRadius: BorderRadius.circular(24),
             onTap: _toggleListening,
@@ -702,18 +701,10 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: _isListening
-                    ? const LinearGradient(
-                  colors: [Color(0xFFEF5350), Color(0xFFE91E63)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
+                    ? const LinearGradient(colors: [Color(0xFFEF5350), Color(0xFFE91E63)])
                     : _brandGradient,
               ),
-              child: Icon(
-                _isListening ? Icons.mic : Icons.mic_none,
-                color: Colors.white,
-                size: 22,
-              ),
+              child: Icon(_isListening ? Icons.mic : Icons.mic_none, color: Colors.white, size: 22),
             ),
           ),
         ],
@@ -722,8 +713,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   }
 }
 
-// --- Widget de Fondo (sin cambios) ---
+// --- Widget de Fondo ---
 class BackgroundArcs extends StatelessWidget {
+  // ... (sin cambios)
   const BackgroundArcs({
     super.key,
     this.color = const Color(0xFFE9EDF2),
@@ -732,7 +724,6 @@ class BackgroundArcs extends StatelessWidget {
     this.maxCoverage = 0.75,
     this.alignment = Alignment.centerLeft,
   });
-
   final Color color;
   final double stroke;
   final double gap;
@@ -760,6 +751,7 @@ class BackgroundArcs extends StatelessWidget {
 }
 
 class _ArcsPainter extends CustomPainter {
+  // ... (sin cambios)
   _ArcsPainter({
     required this.color,
     required this.stroke,
@@ -767,7 +759,6 @@ class _ArcsPainter extends CustomPainter {
     required this.maxCoverage,
     required this.alignment,
   });
-
   final Color color;
   final double stroke;
   final double gap;
@@ -782,14 +773,11 @@ class _ArcsPainter extends CustomPainter {
       ..strokeWidth = stroke
       ..isAntiAlias = true
       ..strokeCap = StrokeCap.round;
-
     final centerY = (alignment.y + 1) / 2 * size.height;
     final center = Offset(0, centerY);
-
     final maxRadius = size.width * maxCoverage;
     final step = stroke + gap;
     final count = (maxRadius / step).floor();
-
     for (int i = 0; i < count; i++) {
       final r = maxRadius - i * step;
       if (r <= 0) break;
@@ -802,14 +790,12 @@ class _ArcsPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// --- NUEVOS WIDGETS DE ANIMACIÓN ---
-
+// --- WIDGETS DE ANIMACIÓN ---
 class _SunWidget extends StatelessWidget {
+  // ... (sin cambios)
   final AnimationController controller;
   final bool isVerySunny;
-
   const _SunWidget({required this.controller, required this.isVerySunny});
-
   @override
   Widget build(BuildContext context) {
     return Align(
@@ -837,16 +823,15 @@ class _SunWidget extends StatelessWidget {
 }
 
 class _RainWidget extends StatefulWidget {
+  // ... (sin cambios)
   final AnimationController controller;
   const _RainWidget({required this.controller});
-
   @override
   State<_RainWidget> createState() => _RainWidgetState();
 }
-
 class _RainWidgetState extends State<_RainWidget> {
+  // ... (sin cambios)
   late final List<_Raindrop> raindrops;
-
   @override
   void initState() {
     super.initState();
@@ -860,7 +845,6 @@ class _RainWidgetState extends State<_RainWidget> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -879,18 +863,16 @@ class _RainWidgetState extends State<_RainWidget> {
 }
 
 class _RainPainter extends CustomPainter {
+  // ... (sin cambios)
   final List<_Raindrop> raindrops;
   final double animationValue;
-
   _RainPainter({required this.raindrops, required this.animationValue});
-
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = Colors.white.withOpacity(0.6)
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
-
     for (var drop in raindrops) {
       final startY = (drop.y + animationValue * drop.speed) % 1.0;
       final p1 = Offset(drop.x * size.width, startY * size.height);
@@ -898,17 +880,232 @@ class _RainPainter extends CustomPainter {
       canvas.drawLine(p1, p2, paint);
     }
   }
-
   @override
-  bool shouldRepaint(covariant _RainPainter oldDelegate) {
-    return animationValue != oldDelegate.animationValue;
-  }
+  bool shouldRepaint(covariant _RainPainter oldDelegate) => animationValue != oldDelegate.animationValue;
 }
 
 class _Raindrop {
+  // ... (sin cambios)
   final double x;
   final double y;
   final double speed;
   final double length;
   _Raindrop({required this.x, required this.y, required this.speed, required this.length});
 }
+
+// --- NUEVOS WIDGETS DE ANIMACIÓN ---
+
+class _WindWidget extends StatefulWidget {
+  final AnimationController controller;
+  const _WindWidget({required this.controller});
+
+  @override
+  State<_WindWidget> createState() => _WindWidgetState();
+}
+
+class _WindWidgetState extends State<_WindWidget> {
+  late final List<_WindLine> windLines;
+
+  @override
+  void initState() {
+    super.initState();
+    windLines = List.generate(30, (i) => _WindLine());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, child) {
+        return CustomPaint(
+          size: Size.infinite,
+          painter: _WindPainter(windLines, widget.controller.value),
+        );
+      },
+    );
+  }
+}
+
+class _WindPainter extends CustomPainter {
+  final List<_WindLine> lines;
+  final double animationValue;
+  _WindPainter(this.lines, this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    for (var line in lines) {
+      final path = Path();
+      final horizontalShift = animationValue * size.width * line.speed;
+
+      path.moveTo(0, size.height * line.y + math.sin(horizontalShift / line.frequency) * line.amplitude);
+
+      for (double x = 1; x <= size.width; x++) {
+        final y = size.height * line.y +
+            math.sin((x + horizontalShift) / line.frequency) * line.amplitude;
+        path.lineTo(x, y);
+      }
+
+      paint.color = Colors.white.withOpacity(line.opacity);
+      paint.strokeWidth = line.stroke;
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _WindLine {
+  final double y = math.Random().nextDouble();
+  final double speed = math.Random().nextDouble() * 0.2 + 0.1;
+  final double amplitude = math.Random().nextDouble() * 20 + 10;
+  final double frequency = math.Random().nextDouble() * 50 + 50;
+  final double stroke = math.Random().nextDouble() * 1.5 + 1;
+  final double opacity = math.Random().nextDouble() * 0.5 + 0.2;
+}
+
+class _StormWidget extends StatefulWidget {
+  final AnimationController controller;
+  const _StormWidget({required this.controller});
+
+  @override
+  State<_StormWidget> createState() => _StormWidgetState();
+}
+
+class _StormWidgetState extends State<_StormWidget> {
+  Timer? _timer;
+  Path? _lightningPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted) {
+        _createLightningPath();
+        widget.controller.forward(from: 0.0);
+      }
+    });
+  }
+
+  void _createLightningPath() {
+    final path = Path();
+    final startX = math.Random().nextDouble() * 0.6 + 0.2;
+    path.moveTo(startX, 0);
+    double currentY = 0;
+    while (currentY < 1.0) {
+      double nextX = startX + (math.Random().nextDouble() - 0.5) * 0.2;
+      double nextY = currentY + math.Random().nextDouble() * 0.2;
+      path.lineTo(nextX, nextY);
+      currentY = nextY;
+    }
+    setState(() => _lightningPath = path);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, child) {
+        return CustomPaint(
+          size: Size.infinite,
+          painter: _LightningPainter(widget.controller.value, _lightningPath),
+        );
+      },
+    );
+  }
+}
+
+class _LightningPainter extends CustomPainter {
+  final double animationValue;
+  final Path? path;
+  _LightningPainter(this.animationValue, this.path);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (path == null || animationValue == 0) return;
+    final flashOpacity = math.sin(animationValue * math.pi);
+    final paint = Paint()
+      ..color = Colors.yellow.withOpacity(flashOpacity * 0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    final Path scaledPath = path!.transform(Matrix4.diagonal3Values(size.width, size.height, 1.0).storage);
+    canvas.drawPath(scaledPath, paint);
+    final glowPaint = Paint()
+      ..color = Colors.white.withOpacity(flashOpacity * 0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), glowPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _SnowWidget extends StatefulWidget {
+  final AnimationController controller;
+  const _SnowWidget({required this.controller});
+
+  @override
+  State<_SnowWidget> createState() => _SnowWidgetState();
+}
+
+class _SnowWidgetState extends State<_SnowWidget> {
+  late final List<_Snowflake> snowflakes;
+
+  @override
+  void initState() {
+    super.initState();
+    snowflakes = List.generate(150, (i) => _Snowflake());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, child) {
+        return CustomPaint(
+          size: Size.infinite,
+          painter: _SnowPainter(snowflakes, widget.controller.value),
+        );
+      },
+    );
+  }
+}
+
+class _SnowPainter extends CustomPainter {
+  final List<_Snowflake> flakes;
+  final double animationValue;
+  _SnowPainter(this.flakes, this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white;
+    for (var flake in flakes) {
+      final y = (flake.y + animationValue * flake.speed) % 1.0;
+      final x = flake.x + math.sin(animationValue * math.pi * 2 + flake.y) * 0.1;
+      paint.color = Colors.white.withOpacity(flake.opacity);
+      canvas.drawCircle(Offset(x * size.width, y * size.height), flake.radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _Snowflake {
+  final double x = math.Random().nextDouble();
+  final double y = math.Random().nextDouble();
+  final double radius = math.Random().nextDouble() * 2 + 1.5;
+  final double speed = math.Random().nextDouble() * 0.1 + 0.05;
+  final double opacity = math.Random().nextDouble() * 0.7 + 0.3;
+}
+

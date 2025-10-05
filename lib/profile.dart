@@ -86,8 +86,6 @@ class ProfilePage extends StatelessWidget {
 
                     // ⬇️ Botón Cerrar sesión con texto en gradiente
                     _buildLogoutButton(context),
-                    const SizedBox(height: 32),
-                    _eventCard(context),
                   ],
                 ),
               ),
@@ -248,47 +246,6 @@ class ProfilePage extends StatelessWidget {
     );
   }
 }
-
-Widget _eventCard(BuildContext context) {
-  return InkWell(
-    borderRadius: BorderRadius.circular(15),
-    onTap: () {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) =>  Eventos()),
-      );
-    },
-    child: Container(
-      decoration: BoxDecoration(
-        color: cardBackgroundColor,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FaIcon(FontAwesomeIcons.calendar, size: 28, color: Colors.grey[700]),
-          const SizedBox(width: 12),
-          Text(
-            'Eventos',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 
 /// Fondo con semicírculos concéntricos en el lado izquierdo.
 class BackgroundArcs extends StatelessWidget {
