@@ -71,6 +71,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   late stt.SpeechToText _speech;
   bool _isListening = false;
 
+  // Control para TTS del primer mensaje
+  bool _hasUserInteracted = false;
+
   // 2. MÉTODOS DE CICLO DE VIDA (initState y dispose)
   @override
   void initState() {
@@ -212,6 +215,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
         _isConnected = true;
       });
 
+      // Enviar mensaje inicial "hola" sin mostrarlo en pantalla
+      _channel.sink.add(json.encode({'message': 'hola'}));
+
       _subscription = _channel.stream.listen(
             (message) {
           if (!mounted) return;
@@ -301,6 +307,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       await _speech.stop();
       setState(() => _isListening = false);
     } else {
+      // Marcar que el usuario ha interactuado
+      _hasUserInteracted = true;
+
       final available = await _speech.initialize();
       if (!available) return;
 
@@ -323,7 +332,10 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   }
 
   Future<void> _speak(String text) async {
-    if (text.isNotEmpty) await _flutterTts.speak(text);
+    // Solo hablar si el usuario ya interactuó
+    if (text.isNotEmpty && _hasUserInteracted) {
+      await _flutterTts.speak(text);
+    }
   }
 
   // --- Lógica de Temas y Mensajes ---
@@ -450,6 +462,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     if (text.isEmpty || !_isConnected) return;
     FocusScope.of(context).unfocus();
 
+    // Marcar que el usuario ha interactuado
+    _hasUserInteracted = true;
+
     if (_isInitialState) {
       _pendingFirstMessage = text;
       _controller.clear();
@@ -468,6 +483,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
   void _startChatTransition({bool addPendingAfter = false}) {
     if (_isHidingIntro) return;
     _isHidingIntro = true;
+
+    // Marcar que el usuario ha interactuado al hacer tap en la esfera
+    _hasUserInteracted = true;
 
     _introCtrl.forward().whenCompleteOrCancel(() {
       if (!mounted) return;
