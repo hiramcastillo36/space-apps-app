@@ -11,23 +11,40 @@ class Index extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 30),
-                _buildAskOlivCard(),
-                const SizedBox(height: 30),
-                _buildSectionTitle('Popular activities'),
-                const SizedBox(height: 20),
-                _buildPopularActivitiesGrid(),
-                const SizedBox(height: 30),
-              ],
+        child: Stack(
+          children: [
+            // ===== Fondo con semicírculos =====
+            Positioned.fill(
+              child: IgnorePointer(
+                child: BackgroundArcs(
+                  color: Color(0xFFEDEFF3),
+                  stroke: 20,
+                  gap: 20,
+                  maxCoverage: 0.50,
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
             ),
-          ),
+            // ===== Contenido =====
+            SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 30),
+                    _buildAskOlivCard(),
+                    const SizedBox(height: 30),
+                    _buildSectionTitle('Popular activities'),
+                    const SizedBox(height: 20),
+                    _buildPopularActivitiesGrid(),
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -116,14 +133,14 @@ class Index extends StatelessWidget {
     );
   }
 
+  /// Helper: círculo con aro blanco + GIF animado dentro
   Widget _olivGifCircle({
     double size = 110,
     double? ringWidthPx,
     double? gapPx,
   }) {
-    final borderW  = ringWidthPx ?? size * 0.055;
-    final innerPad = gapPx ?? size * 0.05;
-    final glow     = size * 0.07;
+    final borderW  = ringWidthPx ?? size * 0.055; // aro delgado
+    final innerPad = gapPx ?? size * 0.05;        // menos espacio => GIF más grande
 
     return Container(
       width: size,
@@ -139,9 +156,7 @@ class Index extends StatelessWidget {
             'assets/images/sphere.gif',
             fit: BoxFit.cover,
             gaplessPlayback: true,
-            errorBuilder: (context, error, stackTrace) {
-              return const SizedBox.shrink();
-            },
+            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
           ),
         ),
       ),
@@ -217,35 +232,7 @@ class Index extends StatelessWidget {
     );
   }
 
-  // ---------------- Bottom bar ----------------
-  Widget _buildBottomNavBar() {
-    return Container(
-      height: 80,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 5,
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.home, 'Home', true),
-          _buildOlivItem(),
-          _buildNavItem(Icons.person_outline, 'Profile', false),
-        ],
-      ),
-    );
-  }
-
+  // ---------------- Bottom item de ejemplo ----------------
   Widget _buildNavItem(IconData icon, String label, bool isActive) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -279,4 +266,86 @@ class Index extends StatelessWidget {
       ),
     );
   }
+}
+
+/// ===== Fondo con semicírculos concéntricos en el lado izquierdo =====
+class BackgroundArcs extends StatelessWidget {
+  const BackgroundArcs({
+    super.key,
+    this.color = const Color(0xFFE9EDF2),
+    this.stroke = 12.0,
+    this.gap = 12.0,
+    this.maxCoverage = 0.75,
+    this.alignment = Alignment.centerLeft,
+  });
+
+  final Color color;
+  final double stroke;
+  final double gap;
+  final double maxCoverage;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        return CustomPaint(
+          size: size,
+          painter: _ArcsPainter(
+            color: color,
+            stroke: stroke,
+            gap: gap,
+            maxCoverage: maxCoverage,
+            alignment: alignment,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ArcsPainter extends CustomPainter {
+  _ArcsPainter({
+    required this.color,
+    required this.stroke,
+    required this.gap,
+    required this.maxCoverage,
+    required this.alignment,
+  });
+
+  final Color color;
+  final double stroke;
+  final double gap;
+  final double maxCoverage;
+  final Alignment alignment;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..isAntiAlias = true
+      ..strokeCap = StrokeCap.round;
+
+    // Centro a la izquierda; alignment.y: -1 arriba, 0 centro, 1 abajo
+    final centerY = (alignment.y + 1) / 2 * size.height;
+    final center = Offset(0, centerY);
+
+    final maxRadius = size.width * maxCoverage;
+    final step = stroke + gap;
+    final count = (maxRadius / step).floor();
+
+    for (int i = 0; i < count; i++) {
+      final r = maxRadius - i * step;
+      if (r <= 0) break;
+      final rect = Rect.fromCircle(center: center, radius: r);
+      // Semicírculo derecho (abre hacia la derecha): -90° a 90°
+      canvas.drawArc(rect, -1.57079632679, 3.14159265359, false, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
