@@ -246,19 +246,17 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
           opacity: (_currentTheme == WeatherTheme.rainy || _currentTheme == WeatherTheme.stormy) ? 1.0 : 0.0,
           child: _RainWidget(controller: _rainController!),
         ),
-        // NUEVO: Animación de Viento
+        // ACTUALIZADO: Animación de Viento
         AnimatedOpacity(
           duration: const Duration(milliseconds: 800),
-          opacity: _currentTheme == WeatherTheme.windy ? 1.0 : 0.0,
+          opacity: _currentTheme == WeatherTheme.windy ? 1.0 : 0.0, // Más opaco
           child: _WindWidget(controller: _windController!),
         ),
-        // NUEVO: Animación de Tormenta
         AnimatedOpacity(
           duration: const Duration(milliseconds: 800),
           opacity: _currentTheme == WeatherTheme.stormy ? 1.0 : 0.0,
           child: _StormWidget(controller: _stormController!),
         ),
-        // NUEVO: Animación de Nieve
         AnimatedOpacity(
           duration: const Duration(milliseconds: 800),
           opacity: _currentTheme == WeatherTheme.snowy ? 1.0 : 0.0,
@@ -623,9 +621,7 @@ class _Raindrop {
   _Raindrop({required this.x, required this.y, required this.speed, required this.length});
 }
 
-
-// --- NUEVOS WIDGETS DE ANIMACIÓN ---
-
+// ACTUALIZADO: Animación de Viento
 class _WindWidget extends StatefulWidget {
   final AnimationController controller;
   const _WindWidget({required this.controller});
@@ -640,7 +636,7 @@ class _WindWidgetState extends State<_WindWidget> {
   @override
   void initState() {
     super.initState();
-    windLines = List.generate(20, (i) => _WindLine());
+    windLines = List.generate(30, (i) => _WindLine()); // Más líneas
   }
 
   @override
@@ -665,21 +661,25 @@ class _WindPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.4)
-      ..style = PaintingStyle.stroke;
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
 
     for (var line in lines) {
-      final startX = (line.x + animationValue * line.speed) % 1.2 - 0.2;
-      final y = line.y * size.height;
-
       final path = Path();
-      path.moveTo(startX * size.width, y);
-      path.quadraticBezierTo(
-        (startX + 0.1) * size.width,
-        y + math.sin(animationValue * math.pi * 2 + line.y) * 20,
-        (startX + 0.2) * size.width,
-        y,
-      );
+      // El desplazamiento horizontal ahora mueve toda la onda
+      final horizontalShift = animationValue * size.width * line.speed;
+
+      // Empezar a dibujar desde la izquierda
+      path.moveTo(0, size.height * line.y + math.sin(horizontalShift / line.frequency) * line.amplitude);
+
+      // Dibujar la onda a lo largo de toda la pantalla
+      for (double x = 1; x <= size.width; x++) {
+        final y = size.height * line.y +
+            math.sin((x + horizontalShift) / line.frequency) * line.amplitude;
+        path.lineTo(x, y);
+      }
+
+      paint.color = Colors.white.withOpacity(line.opacity);
       paint.strokeWidth = line.stroke;
       canvas.drawPath(path, paint);
     }
@@ -690,10 +690,12 @@ class _WindPainter extends CustomPainter {
 }
 
 class _WindLine {
-  final double x = -0.2;
   final double y = math.Random().nextDouble();
-  final double speed = math.Random().nextDouble() * 0.3 + 0.1;
-  final double stroke = math.Random().nextDouble() * 2 + 1;
+  final double speed = math.Random().nextDouble() * 0.2 + 0.1;
+  final double amplitude = math.Random().nextDouble() * 10 + 10;
+  final double frequency = math.Random().nextDouble() * 30 + 50;
+  final double stroke = math.Random().nextDouble() * 1.5 + 1;
+  final double opacity = math.Random().nextDouble() * 0.5 + 0.2;
 }
 
 class _StormWidget extends StatefulWidget {
