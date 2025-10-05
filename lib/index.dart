@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:skai/utils/constans.dart'; // verifica el nombre del archivo
+import 'package:skai/skai.dart';
+import 'package:skai/utils/constans.dart';
 
 class Index extends StatelessWidget {
   const Index({super.key});
@@ -34,7 +35,7 @@ class Index extends StatelessWidget {
                   children: [
                     _buildHeader(),
                     const SizedBox(height: 30),
-                    _buildAskOlivCard(),
+                    _buildAskOlivCard(context),
                     const SizedBox(height: 30),
                     _buildSectionTitle('Popular activities'),
                     const SizedBox(height: 20),
@@ -93,45 +94,55 @@ class Index extends StatelessWidget {
   }
 
   // ---------------- Tarjeta Ask SkAI con GIF circular escalable ----------------
-  Widget _buildAskOlivCard() {
-    return Container(
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF5C6BC0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.purple.withOpacity(0.15),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+  Widget _buildAskOlivCard(BuildContext context) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(30),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SkaiPage()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(30),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF5C6BC0)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(
-            child: Text(
-              'Ask SkAI',
-              style: GoogleFonts.poppins(
-                fontSize: 28,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-              overflow: TextOverflow.ellipsis,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.withOpacity(0.15),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: const Offset(0, 5),
             ),
-          ),
-          // ⇩ Ajusta aquí: size = tamaño total; ringWidthPx = aro; gapPx = separación aro-GIF
-          _olivGifCircle(size: 120, ringWidthPx: 5, gapPx: 4),
-        ],
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                'Ask SkAI',
+                style: GoogleFonts.poppins(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            _olivGifCircle(size: 120, ringWidthPx: 5, gapPx: 4),
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Helper: círculo con aro blanco + GIF animado dentro
   Widget _olivGifCircle({
