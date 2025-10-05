@@ -3,8 +3,6 @@ import 'package:skai/index.dart';
 import 'package:skai/widgets/navbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:skai/Auth.dart';
-import 'package:skai/services/auth_service.dart';
-
 void main() {
   runApp(const MyApp());
 }
@@ -12,22 +10,13 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-      home: FutureBuilder<bool>(
-        future: AuthService.isAuthenticated(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          return snapshot.data == true ? const Index() : const AuthPage();
-        },
-      ),
+        home: const Index(),
     );
   }
 }

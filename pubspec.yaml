@@ -38,9 +38,6 @@ dependencies:
   awesome_snackbar_content:
   flutter_svg:
   google_fonts:
-  web_socket_channel: ^3.0.1
-  http: ^1.2.2
-  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:
