@@ -40,7 +40,7 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      //bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
