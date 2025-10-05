@@ -18,12 +18,12 @@ class Index extends StatelessWidget {
             Positioned.fill(
               child: IgnorePointer(
                 child: BackgroundArcs(
-                color: Color(0xFFEDEFF3),
-                stroke: 20,
-                gap: 20,
-                maxCoverage: 0.50,
-                alignment: Alignment.centerLeft,
-              ),
+                  color: Color(0xFFEDEFF3),
+                  stroke: 20,
+                  gap: 20,
+                  maxCoverage: 0.50,
+                  alignment: Alignment.centerLeft,
+                ),
               ),
             ),
             // ===== Contenido =====
