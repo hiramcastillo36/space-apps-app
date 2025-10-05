@@ -195,13 +195,46 @@ class Index extends StatelessWidget {
         _buildActivityCard(FontAwesomeIcons.personRunning, 'Running'),
         _buildActivityCard(FontAwesomeIcons.mountain, 'Climbing'),
         _buildActivityCard(FontAwesomeIcons.personSwimming, 'Surfing'),
-        _buildActivityCard(FontAwesomeIcons.ellipsis, 'More'),
+        _buildMoreAct(FontAwesomeIcons.ellipsis, 'More'),
       ],
     );
   }
 
   Widget _buildActivityCard(IconData icon, String label) {
     return Container(
+      decoration: BoxDecoration(
+        color: cardBackgroundColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FaIcon(icon, size: 30, color: Colors.grey[700]),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[800],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMoreAct(IconData icon, String label) {
+    return Container(
+      
       decoration: BoxDecoration(
         color: cardBackgroundColor,
         borderRadius: BorderRadius.circular(20),

@@ -4,6 +4,7 @@ import 'package:skai/Auth.dart';
 import 'package:skai/widgets/audio.dart';
 import 'package:skai/widgets/voz.dart';
 import 'package:skai/widgets/navigation_shell.dart';
+import 'package:skai/Activities.dart';
 
 void main() async{
   runApp(const MyApp());
@@ -18,7 +19,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-        home: const NavigationShell(),
+        home: ActivitiesPage(),
         routes: {
           '/login': (context) => const AuthPage(),
         },
