@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:skai/utils/constans.dart';
+import 'package:skai/chat_screen.dart';
 
 class Index extends StatelessWidget {
   const Index({super.key});
@@ -19,7 +20,7 @@ class Index extends StatelessWidget {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 30),
-                _buildAskOlivCard(),
+                _buildAskOlivCard(context),
                 const SizedBox(height: 30),
                 _buildSectionTitle('Popular activities'),
                 const SizedBox(height: 20),
@@ -63,38 +64,46 @@ class Index extends StatelessWidget {
     );
   }
 
-  Widget _buildAskOlivCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: primaryCardColor,
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Ask Oliv',
-            style: GoogleFonts.poppins(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE1BEE7), Color(0xFFBBDEFB)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+  Widget _buildAskOlivCard(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ChatScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: primaryCardColor,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Ask Oliv',
+              style: GoogleFonts.poppins(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
-          ),
-        ],
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE1BEE7), Color(0xFFBBDEFB)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

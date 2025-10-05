@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:skai/utils/constans.dart';
+import 'package:skai/services/auth_service.dart';
+import 'package:skai/index.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -48,7 +50,7 @@ class _AuthPageState extends State<AuthPage> {
               _buildToggleButtons(),
               const SizedBox(height: 20),
               SizedBox(
-                height: 350, // Altura fija para el PageView
+                height: 420, // Aumentar altura para acomodar el campo Name
                 child: PageView(
                   controller: _pageController,
                   onPageChanged: (index) {
@@ -153,9 +155,81 @@ class _AuthPageState extends State<AuthPage> {
 }
 
 // Widget de formulario reutilizable para Login y Registro
-class AuthForm extends StatelessWidget {
+class AuthForm extends StatefulWidget {
   final bool isLogin;
   const AuthForm({super.key, required this.isLogin});
+
+  @override
+  State<AuthForm> createState() => _AuthFormState();
+}
+
+class _AuthFormState extends State<AuthForm> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSubmit() async {
+    // Validaciones
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      _showError('Please fill all fields');
+      return;
+    }
+
+    if (!widget.isLogin && _nameController.text.isEmpty) {
+      _showError('Name is required');
+      return;
+    }
+
+    if (!widget.isLogin && _passwordController.text != _confirmPasswordController.text) {
+      _showError('Passwords do not match');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final result = widget.isLogin
+          ? await AuthService.login(_emailController.text, _passwordController.text)
+          : await AuthService.register(
+              _nameController.text,
+              _emailController.text,
+              _passwordController.text,
+            );
+
+      setState(() => _isLoading = false);
+
+      if (result['success']) {
+        if (!mounted) return;
+        // Navegar a la pantalla principal
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const Index()),
+        );
+      } else {
+        _showError(result['error']);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showError('An error occurred: $e');
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,18 +238,38 @@ class AuthForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildTextField(icon: Icons.email_outlined, hintText: 'Email'),
-          const SizedBox(height: 16),
-          _buildTextField(icon: Icons.lock_outline, hintText: 'Password', obscureText: true),
-          if (!isLogin) ...[
+          if (!widget.isLogin) ...[
+            _buildTextField(
+              controller: _nameController,
+              icon: Icons.person_outline,
+              hintText: 'Name',
+            ),
             const SizedBox(height: 16),
-            _buildTextField(icon: Icons.lock_outline, hintText: 'Confirm Password', obscureText: true),
+          ],
+          _buildTextField(
+            controller: _emailController,
+            icon: Icons.email_outlined,
+            hintText: 'Email',
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: _passwordController,
+            icon: Icons.lock_outline,
+            hintText: 'Password',
+            obscureText: true,
+          ),
+          if (!widget.isLogin) ...[
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _confirmPasswordController,
+              icon: Icons.lock_outline,
+              hintText: 'Confirm Password',
+              obscureText: true,
+            ),
           ],
           const SizedBox(height: 30),
           ElevatedButton(
-            onPressed: () {
-              // TODO: Implement login/signup logic
-            },
+            onPressed: _isLoading ? null : _handleSubmit,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryCardColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -183,22 +277,37 @@ class AuthForm extends StatelessWidget {
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child: Text(
-              isLogin ? 'Login' : 'Create Account',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    widget.isLogin ? 'Login' : 'Create Account',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({required IconData icon, required String hintText, bool obscureText = false}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required IconData icon,
+    required String hintText,
+    bool obscureText = false,
+  }) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
       decoration: InputDecoration(
         hintText: hintText,
