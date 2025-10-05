@@ -338,7 +338,9 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       case 'windy': newTheme = WeatherTheme.windy; break;
       case 'stormy': newTheme = WeatherTheme.stormy; break;
       case 'snowy': newTheme = WeatherTheme.snowy; break;
-      case 'cloudy': newTheme = WeatherTheme.cloudy; break;
+      case 'cold': newTheme = WeatherTheme.cloudy; break;
+      case 'snow': newTheme = WeatherTheme.snowy; break;
+
     // Los moods que no son de clima se mapean a 'normal'
       case 'success':
       case 'loading':
@@ -354,47 +356,86 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
     final input = text.toLowerCase();
     WeatherTheme newTheme = _currentTheme;
 
-    // --- Lógica de decisión con prioridades ---
-    // 1. Palabras clave de alta prioridad que anulan todo lo demás
-    if (input.contains('tormenta') || input.contains('vendaval') || input.contains('⛈') || input.contains('peligro')) {
-      newTheme = WeatherTheme.stormy;
+    // --- 0. Helpers ---
+    bool containsAny(List<String> list) => list.any((k) => input.contains(k));
+
+    final negationKeywords = [
+      'sin probabilidad',
+      'sin probabilidad de',
+      'sin precipitación',
+      'sin lluvia',
+      'no llover',
+      'no lloverá',
+      'no hay lluvia',
+      'no hay precipitación',
+      'poca probabilidad',
+      'baja probabilidad',
+      'sin'
+    ];
+
+    bool _hasNegationBefore(String key, {int window = 40}) {
+      final idxKey = input.indexOf(key);
+      if (idxKey <= 0) return false;
+      for (final neg in negationKeywords) {
+        final idxNeg = input.indexOf(neg);
+        if (idxNeg >= 0 && idxNeg < idxKey && (idxKey - idxNeg) <= window) return true;
+      }
+      return false;
     }
-    // 2. Comprobar negaciones antes que las afirmaciones
-    else if (input.contains('sin') || input.contains('no hay') || input.contains('poca probabilidad')) {
-      // Si dice "sin lluvia", es probable que esté soleado o normal.
-      if (input.contains('sol') || input.contains('despejado')) {
-        newTheme = WeatherTheme.sunny;
-      } else {
-        newTheme = WeatherTheme.normal;
+
+    // --- 1. Temperature first (autoridad) ---
+    final RegExp numberRegex = RegExp(r'(-?\d+(\.\d+)?)');
+    final Match? numberMatch = numberRegex.firstMatch(input);
+    if (numberMatch != null) {
+      final double? temperature = double.tryParse(numberMatch.group(0)!);
+      if (temperature != null) {
+        if (temperature <= 0) {
+          if (_currentTheme != WeatherTheme.snowy) setState(() => _currentTheme = WeatherTheme.snowy);
+          return;
+        } else if (temperature >= 30) {
+          if (_currentTheme != WeatherTheme.verySunny) setState(() => _currentTheme = WeatherTheme.verySunny);
+          return;
+        } else if (temperature >= 10) {
+          if (_currentTheme != WeatherTheme.sunny) setState(() => _currentTheme = WeatherTheme.sunny);
+          return;
+        } else {
+          if (_currentTheme != WeatherTheme.normal) setState(() => _currentTheme = WeatherTheme.normal);
+          return;
+        }
       }
     }
-    // 3. Comprobar condiciones climáticas afirmativas
-    else if (input.contains('lluvia') || input.contains('llover') || input.contains('precipitación') || input.contains('mojado') || input.contains('🌧') || input.contains('paraguas')) {
-      newTheme = WeatherTheme.rainy;
-    }
-    else if (input.contains('viento fuerte') || input.contains('ráfagas') || input.contains('viento')) {
+
+    // --- 2. Keyword lists ---
+    final stormWords = ['tormenta', 'vendaval', 'ráfagas fuertes', 'viento fuerte', '⛈', 'peligro'];
+    final windyWords = ['viento fuerte', 'ráfagas', 'viento', 'vendaval'];
+    final snowWords = ['nieve', 'snow', 'nevando'];
+    final cloudyWords = ['nublado', 'nubes', 'cubierto', 'gris', '☁'];
+    final sunnyWords = ['soleado', 'despejado', 'perfecto', 'excelente', 'ideal', '☀', 'sol'];
+    final rainWords = ['lluv', 'precip', 'mojado', 'llover', '🌧', 'paraguas'];
+
+    // --- 3. Detección ordenada ---
+    if (containsAny(stormWords)) {
+      newTheme = WeatherTheme.stormy;
+    } else if (containsAny(windyWords)) {
       newTheme = WeatherTheme.windy;
-    }
-    else if (input.contains('nieve') || input.contains('snow')) {
+    } else if (containsAny(snowWords)) {
       newTheme = WeatherTheme.snowy;
-    }
-    else if (input.contains('nublado') || input.contains('nubes') || input.contains('cubierto') || input.contains('gris') || input.contains('☁')) {
+    } else if (containsAny(cloudyWords)) {
       newTheme = WeatherTheme.cloudy;
-    }
-    else if (input.contains('soleado') || input.contains('despejado') || input.contains('perfecto') || input.contains('excelente') || input.contains('ideal') || input.contains('☀') || input.contains('sol')) {
+    } else if (containsAny(sunnyWords)) {
       newTheme = WeatherTheme.sunny;
-    }
-    // 4. Fallback a la temperatura si no se encontraron palabras clave
-    else {
-      final RegExp numberRegex = RegExp(r'(-?\d+(\.\d+)?)');
-      final Match? numberMatch = numberRegex.firstMatch(input);
-      if (numberMatch != null) {
-        double? temperature = double.tryParse(numberMatch.group(0)!);
-        if (temperature != null) {
-          if (temperature <= 0) newTheme = WeatherTheme.snowy;
-          else if (temperature >= 30) newTheme = WeatherTheme.verySunny;
-          else if (temperature >= 18) newTheme = WeatherTheme.sunny;
-          else newTheme = WeatherTheme.normal;
+    } else {
+      // Detect rain but ignore it if there's a nearby negation like "sin probabilidad..."
+      for (final r in rainWords) {
+        if (input.contains(r) && !_hasNegationBefore(r)) {
+          newTheme = WeatherTheme.rainy;
+          break;
+        }
+      }
+
+      if (newTheme == _currentTheme) {
+        if (input.contains('sin probabilidad') || input.contains('sin precipitación') || input.contains('sin lluvia')) {
+          newTheme = WeatherTheme.snowy;
         }
       }
     }
@@ -879,7 +920,6 @@ class _RainWidgetState extends State<_RainWidget> {
 }
 
 class _RainPainter extends CustomPainter {
-  // ... (sin cambios)
   final List<_Raindrop> raindrops;
   final double animationValue;
   _RainPainter({required this.raindrops, required this.animationValue});
@@ -901,7 +941,6 @@ class _RainPainter extends CustomPainter {
 }
 
 class _Raindrop {
-  // ... (sin cambios)
   final double x;
   final double y;
   final double speed;

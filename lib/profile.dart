@@ -64,26 +64,6 @@ class ProfilePage extends StatelessWidget {
                     Center(child: _buildHeader()),
                     const SizedBox(height: 40),
 
-                    _buildSectionTitle('Most recent activities'),
-                    const SizedBox(height: 20),
-                    _buildActivityGrid(const [
-                      FontAwesomeIcons.personRunning,
-                      FontAwesomeIcons.mountain,
-                      FontAwesomeIcons.personSwimming,
-                      FontAwesomeIcons.personBiking,
-                    ]),
-                    const SizedBox(height: 40),
-
-                    _buildSectionTitle('My favorite activities'),
-                    const SizedBox(height: 20),
-                    _buildActivityGrid(const [
-                      FontAwesomeIcons.personRunning,
-                      FontAwesomeIcons.mountain,
-                      FontAwesomeIcons.personSwimming,
-                      FontAwesomeIcons.personBiking,
-                    ]),
-                    const SizedBox(height: 48),
-
                     // ⬇️ Botón Cerrar sesión con texto en gradiente
                     _buildLogoutButton(context),
                   ],
