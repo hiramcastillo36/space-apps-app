@@ -72,10 +72,10 @@ class _AuthPageState extends State<AuthPage> {
   Widget _buildHeader() {
     return Column(
       children: [
-        const FaIcon(FontAwesomeIcons.rocket, size: 60, color: primaryTextColor),
+        Image.asset('assets/images/logo_azul.png', width: 120, height: 120),
         const SizedBox(height: 20),
         Text(
-          'Welcome to SKAI',
+          'Welcome',
           textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
             fontSize: 28,

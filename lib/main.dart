@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:skai/index.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:skai/Auth.dart';
+import 'package:skai/profile.dart';
 
 void main() {
   runApp(const MyApp());
@@ -15,7 +17,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-        home: const Index(),
+        home: const ProfilePage(),
     );
   }
 }
