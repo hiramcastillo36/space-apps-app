@@ -6,9 +6,42 @@ import 'package:skai/utils/constans.dart';
 import 'package:skai/Auth.dart';
 import 'events.dart';
 import 'eventsModel.dart';
+import 'package:skai/services/user_service.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String _userName = '';
+  String _userEmail = '';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final userInfo = await UserService.getUserInfo();
+    if (userInfo['success'] == true && mounted) {
+      setState(() {
+        _userName = userInfo['name'] ?? '';
+        _userEmail = userInfo['email'] ?? '';
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   // Gradiente usado en los títulos y ahora en el texto del botón
   static const LinearGradient _titleGradient = LinearGradient(
@@ -83,7 +116,19 @@ class ProfilePage extends StatelessWidget {
       children: [
         const Icon(Icons.person, size: 100, color: Colors.grey),
         const SizedBox(height: 16),
-        _gradientTitle('Chino', fontSize: 28, weight: FontWeight.bold),
+        _isLoading
+            ? const CircularProgressIndicator()
+            : _gradientTitle(_userName.isNotEmpty ? _userName : 'User', fontSize: 28, weight: FontWeight.bold),
+        if (_userEmail.isNotEmpty && !_isLoading) ...[
+          const SizedBox(height: 8),
+          Text(
+            _userEmail,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
       ],
     );
   }

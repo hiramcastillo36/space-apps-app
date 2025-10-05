@@ -4,11 +4,42 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:skai/utils/constans.dart';
 import 'package:skai/skai.dart';
 import 'package:skai/widgets/weather_card.dart';
+import 'package:skai/services/user_service.dart';
 
-class Index extends StatelessWidget {
+class Index extends StatefulWidget {
   const Index({super.key, this.onOpenSkai});
 
   final VoidCallback? onOpenSkai;
+
+  @override
+  State<Index> createState() => _IndexState();
+}
+
+class _IndexState extends State<Index> {
+  String _userName = 'there';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final userInfo = await UserService.getUserInfo();
+    if (userInfo['success'] == true && mounted) {
+      setState(() {
+        _userName = userInfo['name'] ?? 'there';
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +84,7 @@ class Index extends StatelessWidget {
         ShaderMask(
           shaderCallback: (bounds) => gradient.createShader(bounds),
           child: Text(
-            'Hello, Chino!',
+            'Hello, $_userName!',
             style: GoogleFonts.poppins(
               fontSize: 40,
               fontWeight: FontWeight.bold,
@@ -83,8 +114,8 @@ class Index extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(30),
         onTap: () {
-          if (onOpenSkai != null) {
-            onOpenSkai!();
+          if (widget.onOpenSkai != null) {
+            widget.onOpenSkai!();
           } else {
             Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SkaiPage()));
           }
