@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:skai/utils/constans.dart'; // revisa el nombre del archivo
+import 'package:skai/utils/constans.dart'; // verifica el nombre del archivo
 
 class Index extends StatelessWidget {
   const Index({super.key});
@@ -110,17 +110,26 @@ class Index extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          _olivGifCircle(size: 120), // ⇦ ajusta el tamaño aquí (p.ej. 110, 130, 140)
+          // ⇩ Ajusta aquí: size = tamaño total; ringWidthPx = aro; gapPx = separación aro-GIF
+          _olivGifCircle(size: 120, ringWidthPx: 5, gapPx: 4),
         ],
       ),
     );
   }
 
-  // Helper: círculo con aro blanco + gradiente + GIF animado dentro
-  Widget _olivGifCircle({double size = 110}) {
-    final borderW = size * 0.10;   // grosor del aro blanco
-    final glow    = size * 0.08;   // brillo suave
-    final innerPad = size * 0.12;  // espacio entre aro y GIF (reduce para que el GIF se vea aún más grande)
+  /// Helper: círculo con aro blanco + (opcional) gradiente suave + GIF animado dentro
+  ///
+  /// [size]         Tamaño total del círculo (externo).
+  /// [ringWidthPx]  Grosor del aro blanco (en px). Si es null, se calcula proporcionalmente.
+  /// [gapPx]        Separación interna entre aro y GIF (en px). Menos gap => GIF más grande.
+  Widget _olivGifCircle({
+    double size = 110,
+    double? ringWidthPx,
+    double? gapPx,
+  }) {
+    final borderW  = ringWidthPx ?? size * 0.055; // más delgado que antes
+    final innerPad = gapPx ?? size * 0.05;        // menos espacio => GIF más grande
+    final glow     = size * 0.07;
 
     return Container(
       width: size,
@@ -140,7 +149,6 @@ class Index extends StatelessWidget {
               return const SizedBox.shrink();
             },
           ),
-          
         ),
       ),
     );
@@ -266,7 +274,7 @@ class Index extends StatelessWidget {
     return Container(
       width: 60,
       height: 60,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
       ),
       child: const Center(
