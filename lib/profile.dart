@@ -6,18 +6,16 @@ import 'package:skai/utils/constans.dart';
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
-  // Gradiente reutilizable (mismo que en Index)
   static const LinearGradient _titleGradient = LinearGradient(
     colors: [
-      Color(0xFF5B86E5), // azul
-      Color(0xFF9C27B0), // violeta
-      Color(0xFFE91E63), // rosa
+      Color(0xFF5B86E5),
+      Color(0xFF9C27B0),
+      Color(0xFFE91E63),
     ],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
 
-  // Helper para texto con gradiente
   Widget _gradientTitle(
     String text, {
     double fontSize = 20,
@@ -30,7 +28,7 @@ class ProfilePage extends StatelessWidget {
         style: GoogleFonts.poppins(
           fontSize: fontSize,
           fontWeight: weight,
-          color: Colors.white, // necesario para que el Shader pinte
+          color: Colors.white,
         ),
       ),
     );
@@ -43,14 +41,13 @@ class ProfilePage extends StatelessWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            // Fondo con semicírculos
             const Positioned.fill(
               child: BackgroundArcs(
-                color: Color(0xFFEDEFF3), // gris claro
-                stroke: 12,
-                gap: 12,
-                maxCoverage: 0.78,
-                alignment: Alignment.topLeft,
+                color: Color(0xFFEDEFF3),
+                stroke: 20,
+                gap: 20,
+                maxCoverage: 0.50,
+                alignment: Alignment.centerLeft,
               ),
             ),
             // Contenido
@@ -58,9 +55,9 @@ class ProfilePage extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // títulos a la izquierda
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Center(child: _buildHeader()), // header centrado
+                    Center(child: _buildHeader()),
                     const SizedBox(height: 40),
                     _buildSectionTitle('Most recent activities'),
                     const SizedBox(height: 20),
@@ -86,7 +83,6 @@ class ProfilePage extends StatelessWidget {
           ],
         ),
       ),
-      //bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
@@ -265,7 +261,6 @@ class _ArcsPainter extends CustomPainter {
       ..isAntiAlias = true
       ..strokeCap = StrokeCap.round;
 
-    // Centro a la izquierda; ajusta vertical con alignment.y (-1 arriba, 0 centro, 1 abajo)
     final centerY = (alignment.y + 1) / 2 * size.height;
     final center = Offset(0, centerY);
 
