@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-        home: ActivitiesPage(),
+        home: const NavigationShell(),
         routes: {
           '/login': (context) => const AuthPage(),
         },
