@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:skai/index.dart';
-import 'package:skai/widgets/navbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:skai/Auth.dart';
 import 'package:skai/widgets/audio.dart';
 import 'package:skai/widgets/voz.dart';
-void main() {
+import 'package:skai/widgets/navigation_shell.dart';
+
+void main() async{
   runApp(const MyApp());
 }
 
@@ -18,7 +18,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-        home: const TextToSpeechView(),
+        home: const NavigationShell(),
+        routes: {
+          '/login': (context) => const AuthPage(),
+        },
     );
   }
 }
