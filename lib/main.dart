@@ -5,29 +5,28 @@ import 'package:skai/Auth.dart';
 import 'package:skai/profile.dart';
 import 'package:skai/widgets/navbar.dart';
 import 'package:skai/widgets/navigation_shell.dart';
-
+import 'package:skai/services/auth_service.dart';
 import 'package:skai/widgets/audio.dart';
 import 'package:skai/widgets/voz.dart';
-import 'package:skai/widgets/navigation_shell.dart';
 
-
-void main() async{
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SKAI',
       theme: buildTheme(context),
-        home: const NavigationShell(),
-        routes: {
-          '/login': (context) => const AuthPage(),
-        },
+      home: const AuthPage(),
+      routes: {
+        '/login': (context) => const AuthPage(),
+        '/home': (context) => const NavigationShell(),
+      },
     );
   }
 }

@@ -42,11 +42,17 @@ class CustomBottomNavBar extends StatelessWidget {
           ),
           // Item central de SkAI
           _buildSkaiItem(index: 1),
+          // Item de Eventos
+          _buildNavItem(
+            icon: selectedIndex == 2 ? FontAwesomeIcons.solidCalendar : FontAwesomeIcons.calendar,
+            label: 'Eventos',
+            index: 2,
+          ),
           // Item de Perfil
           _buildNavItem(
-            icon: selectedIndex == 2 ? FontAwesomeIcons.solidUser : FontAwesomeIcons.user,
+            icon: selectedIndex == 3 ? FontAwesomeIcons.solidUser : FontAwesomeIcons.user,
             label: 'Profile',
-            index: 2,
+            index: 3,
           ),
         ],
       ),

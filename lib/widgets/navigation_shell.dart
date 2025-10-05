@@ -21,6 +21,7 @@ class _NavigationShellState extends State<NavigationShell> {
   late final List<Widget> _pages = <Widget>[
     Index(onOpenSkai: () => _onItemTapped(1)),
     const SkaiPage(),
+    const Eventos(),
     const ProfilePage(),
   ];
 

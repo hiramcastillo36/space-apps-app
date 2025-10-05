@@ -6,9 +6,8 @@ class AuthService {
   static String? _authToken;
 
   static String get baseUrl {
-    // Para emulador Android usa 10.0.2.2
-    // Si estás usando un dispositivo real, cambia esto a la IP de tu computadora
-    return 'http://10.0.2.2:8080';
+    // Servidor de producción
+    return 'http://20.151.177.103:8080';
   }
 
   // Login - Usa el endpoint /api/user/token/

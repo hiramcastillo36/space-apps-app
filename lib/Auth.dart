@@ -13,8 +13,6 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
-  // Control del PageView para alternar entre Login y Sign Up
-  final PageController _pageController = PageController();
   bool _isLoginView = true;
 
   // Gradiente de marca (mismo que usas en Index/Profile)
@@ -24,21 +22,10 @@ class _AuthPageState extends State<AuthPage> {
     end: Alignment.centerRight,
   );
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
   void _toggleView(bool isLogin) {
     setState(() {
       _isLoginView = isLogin;
     });
-    _pageController.animateToPage(
-      isLogin ? 0 : 1,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   // Helper para texto con degradado
@@ -84,21 +71,10 @@ class _AuthPageState extends State<AuthPage> {
                 const SizedBox(height: 30),
                 _buildToggleButtons(),
                 const SizedBox(height: 20),
-                SizedBox(
-                  height: 350,
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _isLoginView = index == 0;
-                      });
-                    },
-                    children: const [
-                      AuthForm(isLogin: true),
-                      AuthForm(isLogin: false),
-                    ],
-                  ),
-                ),
+                // Mostrar formulario sin PageView para evitar problemas de altura
+                _isLoginView
+                    ? const AuthForm(isLogin: true)
+                    : const AuthForm(isLogin: false),
               ],
             ),
           ),
@@ -243,9 +219,9 @@ class _AuthFormState extends State<AuthForm> {
 
       if (result['success']) {
         if (!mounted) return;
-        // Navegar a la pantalla principal
+        // Navegar a la pantalla principal con NavigationShell
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const Index()),
+          MaterialPageRoute(builder: (context) => const NavigationShell()),
         );
       } else {
         _showError(result['error']);

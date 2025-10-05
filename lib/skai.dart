@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:async';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:skai/services/auth_service.dart';
+import 'package:skai/services/conversation_service.dart';
 
 // Modelo de mensaje
 class ChatMessage {
@@ -29,8 +30,6 @@ class _SkaiPageState extends State<SkaiPage>
   final List<ChatMessage> _messages = [];
 
   bool _isInitialState = true;   // estamos en la vista inicial
-  bool _isTyping = false;        // indicador de "pensando"
-  int _replySession = 0;         // evita carreras de respuestas
 
   // Animación de salida del sphere (intro)
   late final AnimationController _introCtrl;
@@ -50,6 +49,7 @@ class _SkaiPageState extends State<SkaiPage>
   late WebSocketChannel _channel;
   bool _isConnected = false;
   StreamSubscription? _subscription;
+  int? _conversationId;
 
   // Text-to-Speech
   late FlutterTts _flutterTts;
@@ -71,12 +71,52 @@ class _SkaiPageState extends State<SkaiPage>
         CurvedAnimation(parent: _introCtrl, curve: Curves.easeInOutCubic);
     _initTts();
     _initSpeech();
-    _connectWebSocket();
+    _createNewConversation();
   }
 
-  void _connectWebSocket() {
+  Future<void> _createNewConversation() async {
     try {
-      final wsUrl = 'ws://20.151.177.103:8080/ws/chat/1/';
+      // Obtener el token de autenticación
+      final token = await AuthService.getToken();
+      if (token == null) {
+        print('No auth token available');
+        return;
+      }
+
+      // Crear una nueva conversación cada vez que se abre SkAI
+      final conversationResult = await ConversationService.createConversation(
+        'Chat ${DateTime.now().toString().split('.')[0]}'
+      );
+
+      if (!conversationResult['success']) {
+        print('Failed to create conversation: ${conversationResult['error']}');
+        return;
+      }
+
+      _conversationId = ConversationService.getConversationId(conversationResult);
+      if (_conversationId == null) {
+        print('No conversation ID received');
+        return;
+      }
+
+      print('New conversation created with ID: $_conversationId');
+
+      // Ahora conectar al WebSocket
+      _connectWebSocket();
+    } catch (e) {
+      print('Error creating conversation: $e');
+    }
+  }
+
+  void _connectWebSocket() async {
+    try {
+      if (_conversationId == null) {
+        print('No conversation ID available');
+        return;
+      }
+
+      // Conectar al WebSocket con el ID de conversación
+      final wsUrl = 'ws://20.151.177.103:8080/ws/chat/$_conversationId/';
 
       _channel = WebSocketChannel.connect(
         Uri.parse(wsUrl),
@@ -168,8 +208,43 @@ class _SkaiPageState extends State<SkaiPage>
     });
   }
 
-  void _initSpeech() {
+  void _initSpeech() async {
     _speech = stt.SpeechToText();
+    await _speech.initialize(
+      onError: (error) => print('Speech error: $error'),
+      onStatus: (status) => print('Speech status: $status'),
+    );
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      // Detener escucha
+      await _speech.stop();
+      setState(() => _isListening = false);
+    } else {
+      // Iniciar escucha
+      final available = await _speech.initialize();
+      if (!available) {
+        print('Speech recognition not available');
+        return;
+      }
+
+      setState(() => _isListening = true);
+
+      await _speech.listen(
+        onResult: (result) {
+          if (result.finalResult) {
+            setState(() {
+              _controller.text = result.recognizedWords;
+              _isListening = false;
+            });
+          }
+        },
+        localeId: 'es_ES', // Español
+        cancelOnError: true,
+        listenMode: stt.ListenMode.confirmation,
+      );
+    }
   }
 
   Future<void> _speak(String text) async {
@@ -189,7 +264,6 @@ class _SkaiPageState extends State<SkaiPage>
     if (text.isEmpty || !_isConnected) return;
 
     FocusScope.of(context).unfocus();
-    final message = _controller.text;
 
     if (_isInitialState) {
       // Si todavía estamos en la intro, primero ocultamos con animación
@@ -207,56 +281,14 @@ class _SkaiPageState extends State<SkaiPage>
 
     // Enviar mensaje por WebSocket
     final jsonMessage = json.encode({
-      'message': message,
+      'message': text,
     });
     _channel.sink.add(jsonMessage);
 
     _controller.clear();
-
-    _getSkaiResponse(userMessage.text);
     _scrollToBottom();
   }
 
-  Future<void> _getSkaiResponse(String userInput) async {
-    final int session = ++_replySession; // token de sesión
-    String responseText;
-    final input = userInput.toLowerCase();
-
-    if (input.contains('soccer') || input.contains('jugar')) {
-      responseText =
-          "Hey Chino, I wouldn't recommend playing right now, looks like there's a chance of rain around 4 PM in San Luis Potosi. Maybe plan something indoors so you don't get caught in the rain";
-    } else if (input.contains('hot') || input.contains('calor')) {
-      responseText = "It’s very hot";
-    } else {
-      responseText = "You're welcome Chino :)";
-    }
-
-    setState(() => _isTyping = true);
-
-    // Simula “pensando…”
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted || session != _replySession) return;
-    setState(() {
-      _messages.add(ChatMessage(text: responseText, isUser: false));
-    });
-    _scrollToBottom();
-
-    // Secuencia de “gracias”
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted || session != _replySession) return;
-    setState(() {
-      _messages.add(ChatMessage(text: "Thanks Oliv", isUser: true));
-    });
-    _scrollToBottom();
-
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted || session != _replySession) return;
-    setState(() {
-      _messages.add(ChatMessage(text: "You're welcome Chino :)", isUser: false));
-      _isTyping = false;
-    });
-    _scrollToBottom();
-  }
 
   // --- Transición de la intro (sphere) al chat ---
 
@@ -279,7 +311,12 @@ class _SkaiPageState extends State<SkaiPage>
         setState(() {
           _messages.add(userMessage);
         });
-        _getSkaiResponse(userMessage.text);
+
+        // Enviar mensaje por WebSocket
+        final jsonMessage = json.encode({
+          'message': first,
+        });
+        _channel.sink.add(jsonMessage);
       }
 
       // Limpia bandera después de terminar
@@ -439,32 +476,8 @@ class _SkaiPageState extends State<SkaiPage>
         16,
         8 + MediaQuery.of(context).viewInsets.bottom, // evita que lo tape el teclado
       ),
-      itemCount: _messages.length + (_isTyping ? 1 : 0),
+      itemCount: _messages.length,
       itemBuilder: (context, index) {
-        if (_isTyping && index == _messages.length) {
-          // “Typing” con sphere pequeño
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
-            child: Row(
-              children: [
-                _skaiGifCircle(size: 40),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Opacity(
-                    opacity: 0.7,
-                    child: Container(
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
         final message = _messages[index];
         return _buildChatBubble(message);
       },
@@ -476,21 +489,13 @@ class _SkaiPageState extends State<SkaiPage>
     final isUser = message.isUser;
 
     if (!isUser) {
-      // SkAI: GIF + tarjeta
+      // SkAI: GIF + tarjeta (sin Hero para evitar conflictos)
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Para una transición bonita desde la intro, puedes dejar el Hero aquí también
-            Hero(
-              tag: 'skai-sphere-hero',
-              flightShuttleBuilder: (ctx, anim, dir, from, to) {
-                // Shuttle default; puedes personalizar si quieres
-                return to.widget;
-              },
-              child: _skaiGifCircle(size: 44),
-            ),
+            _skaiGifCircle(size: 44),
             const SizedBox(width: 10),
             Expanded(
               child: Container(
@@ -628,20 +633,28 @@ Widget _buildInputArea() {
 
         const SizedBox(width: 8),
 
-        // Botón micrófono (solo UI por ahora)
+        // Botón micrófono con speech-to-text
         InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: () {
-            // TODO: integrar reconocimiento de voz aquí
-          },
+          onTap: _toggleListening,
           child: Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: _brandGradient,
+              gradient: _isListening
+                  ? const LinearGradient(
+                      colors: [Color(0xFFEF5350), Color(0xFFE91E63)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : _brandGradient,
             ),
-            child: const Icon(Icons.mic, color: Colors.white, size: 22),
+            child: Icon(
+              _isListening ? Icons.mic : Icons.mic_none,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ),
       ],
