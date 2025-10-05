@@ -24,7 +24,17 @@ class _SpeechToTextExampleState extends State<SpeechToTextExample> {
     if (!_isListening) {
       bool available = await _speech.initialize(
         onStatus: (val) => print('Estado: $val'),
-        onError: (val) => print('Error: $val'),
+        onError: (val) {
+          print('Error: $val');
+          setState(() {
+            _isListening = false;
+            if (val.errorMsg == 'error_no_match') {
+              _text = "No se pudo entender el audio. Intenta hablar más claro.";
+            } else {
+              _text = "Error: ${val.errorMsg}";
+            }
+          });
+        },
       );
       if (available) {
         setState(() => _isListening = true);
@@ -35,7 +45,15 @@ class _SpeechToTextExampleState extends State<SpeechToTextExample> {
               _confidence = val.confidence;
             }
           }),
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 5),
+          cancelOnError: true,
+          listenMode: stt.ListenMode.confirmation,
         );
+      } else {
+        setState(() {
+          _text = "Reconocimiento de voz no disponible";
+        });
       }
     } else {
       setState(() => _isListening = false);

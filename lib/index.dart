@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:skai/utils/constans.dart'; // verifica el nombre del archivo
+import 'package:skai/utils/constans.dart';
+import 'package:skai/chat_screen.dart';
+import 'package:skai/skai.dart';
+import 'package:skai/utils/constans.dart';
 
 class Index extends StatelessWidget {
-  const Index({super.key});
+  const Index({super.key, this.onOpenSkai});
+
+  /// Callback que permite al contenedor (tu NavigationShell) cambiar de tab.
+  /// Si es null, se hace un Navigator.push a SkaiPage como respaldo.
+  final VoidCallback? onOpenSkai;
 
   @override
   Widget build(BuildContext context) {
@@ -14,15 +21,15 @@ class Index extends StatelessWidget {
         child: Stack(
           children: [
             // ===== Fondo con semicírculos =====
-            Positioned.fill(
+            const Positioned.fill(
               child: IgnorePointer(
                 child: BackgroundArcs(
-                color: Color(0xFFEDEFF3),
-                stroke: 20,
-                gap: 20,
-                maxCoverage: 0.50,
-                alignment: Alignment.centerLeft,
-              ),
+                  color: Color(0xFFEDEFF3),
+                  stroke: 20,
+                  gap: 20,
+                  maxCoverage: 0.50,
+                  alignment: Alignment.centerLeft,
+                ),
               ),
             ),
             // ===== Contenido =====
@@ -34,7 +41,7 @@ class Index extends StatelessWidget {
                   children: [
                     _buildHeader(),
                     const SizedBox(height: 30),
-                    _buildAskOlivCard(),
+                    _buildAskOlivCard(context),
                     const SizedBox(height: 30),
                     _buildSectionTitle('Popular activities'),
                     const SizedBox(height: 20),
@@ -54,9 +61,9 @@ class Index extends StatelessWidget {
   Widget _buildHeader() {
     const gradient = LinearGradient(
       colors: [
-        Color(0xFF5B86E5), // azul
-        Color(0xFF9C27B0), // violeta
-        Color(0xFFE91E63), // rosa
+        Color(0xFF5B86E5),
+        Color(0xFF9C27B0),
+        Color(0xFFE91E63),
       ],
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
@@ -72,7 +79,7 @@ class Index extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: 40,
               fontWeight: FontWeight.bold,
-              color: Colors.white, // necesario para que el Shader pinte el gradiente
+              color: Colors.white,
             ),
           ),
         ),
@@ -93,42 +100,57 @@ class Index extends StatelessWidget {
   }
 
   // ---------------- Tarjeta Ask SkAI con GIF circular escalable ----------------
-  Widget _buildAskOlivCard() {
-    return Container(
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF5C6BC0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+  Widget _buildAskOlivCard(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.purple.withOpacity(0.15),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(
-            child: Text(
-              'Ask SkAI',
-              style: GoogleFonts.poppins(
-                fontSize: 28,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-              overflow: TextOverflow.ellipsis,
+        onTap: () {
+          if (onOpenSkai != null) {
+            onOpenSkai!(); // cambia a la pestaña SkAI (mantiene navbar)
+          } else {
+            // Respaldo: navegación directa si se usa Index fuera del shell
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SkaiPage()),
+            );
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF5C6BC0)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.purple.withOpacity(0.15),
+                spreadRadius: 2,
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-          // ⇩ Ajusta aquí: size = tamaño total; ringWidthPx = aro; gapPx = separación aro-GIF
-          _olivGifCircle(size: 120, ringWidthPx: 5, gapPx: 4),
-        ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  'Ask SkAI',
+                  style: GoogleFonts.poppins(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              _olivGifCircle(size: 120, ringWidthPx: 5, gapPx: 4),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -139,8 +161,8 @@ class Index extends StatelessWidget {
     double? ringWidthPx,
     double? gapPx,
   }) {
-    final borderW  = ringWidthPx ?? size * 0.055; // aro delgado
-    final innerPad = gapPx ?? size * 0.05;        // menos espacio => GIF más grande
+    final borderW = ringWidthPx ?? size * 0.055;
+    final innerPad = gapPx ?? size * 0.05;
 
     return Container(
       width: size,
@@ -288,14 +310,9 @@ class Index extends StatelessWidget {
     return Container(
       width: 60,
       height: 60,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-      ),
+      decoration: const BoxDecoration(shape: BoxShape.circle),
       child: const Center(
-        child: FaIcon(
-          FontAwesomeIcons.ring,
-          color: primaryTextColor,
-        ),
+        child: FaIcon(FontAwesomeIcons.ring, color: primaryTextColor),
       ),
     );
   }

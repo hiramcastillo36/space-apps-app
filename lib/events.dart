@@ -1,37 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'eventsModel.dart'; 
+import 'eventsModel.dart';
 import 'package:skai/utils/constans.dart';
+import 'package:skai/services/events_service.dart';
 
-
-
-final List<Map<String, dynamic>> eventJsonList = [
-  {
-    "id": 1,
-    "user_email": "user@example.com",
-    "conversation_title": "Weather Consultation",
-    "event_name": "Fiesta de cumpleaños",
-    "event_date": "2027-08-29T21:00:00Z",
-    "location_name": "Queretaro",
-    "latitude": 20.58806,
-    "longitude": -100.38806,
-    "weather_data": {
-      "temperature": "25.3 C",
-      "precipitation": "0 mm"
-    },
-    "temperature": null,
-    "precipitation": null,
-    "wind_speed": null,
-    "created_at": "2025-10-05T04:30:08.853633Z",
-    "updated_at": "2025-10-05T04:30:08.853655Z"
-  }
-];
-
-final List<Evento> sampleEvents =
-    eventJsonList.map((json) => Evento.fromJson(json)).toList();
-
-class Eventos extends StatelessWidget {
+class Eventos extends StatefulWidget {
   const Eventos({super.key});
+
+  @override
+  State<Eventos> createState() => _EventosState();
+}
+
+class _EventosState extends State<Eventos> {
+  List<Evento> _events = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final result = await EventsService.getEvents();
+
+    if (!mounted) return;
+
+    if (result['success']) {
+      final List<dynamic> eventsList = result['data'] as List<dynamic>;
+      setState(() {
+        _events = eventsList.map((json) => Evento.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _error = result['error'];
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,99 +59,183 @@ class Eventos extends StatelessWidget {
     );
 
     return Scaffold(
-  body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: ShaderMask(
-              shaderCallback: (bounds) => gradient.createShader(bounds),
-              child: Text(
-                'Mis eventos',
-                style: GoogleFonts.poppins(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              itemCount: sampleEvents.length,
-              itemBuilder: (context, index) {
-                final evento = sampleEvents[index];
-                return Card(
-                  margin: const EdgeInsets.all(10),
-                  child: ListTile(
-                    title: Text(
-                      evento.eventName,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("📅 ${evento.eventDate.toLocal()}"),
-                        Text("📍 ${evento.locationName}"),
-                        Text("🌡️ Temp: ${evento.temperature}"),
-                        Text("☔ Precipitación: ${evento.precipitation}"),
-                      ],
+      backgroundColor: const Color(0xFFF7F9FC),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ShaderMask(
+                    shaderCallback: (bounds) => gradient.createShader(bounds),
+                    child: Text(
+                      'Mis eventos',
+                      style: GoogleFonts.poppins(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                );
-              },
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _loadEvents,
+                  ),
+                ],
+              ),
             ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_outlined, 'Home', false),
-              _buildSkaiItem(),
-              _buildNavItem(Icons.person, 'Profile', true),
-            ],
-          ),
-        ],
+            const SizedBox(height: 16),
+            Expanded(
+              child: _buildContent(),
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
 
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: isActive ? primaryTextColor : Colors.grey, size: 28),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            color: isActive ? primaryTextColor : Colors.grey,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            fontSize: 12,
-          ),
-        )
-      ],
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 60, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Error: $_error',
+              style: GoogleFonts.poppins(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadEvents,
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_events.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.event_busy, size: 60, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'No tienes eventos',
+              style: GoogleFonts.poppins(fontSize: 18, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Pregúntale a SkAI sobre el clima\npara tus próximas actividades',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadEvents,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _events.length,
+        itemBuilder: (context, index) {
+          final evento = _events[index];
+          return _buildEventCard(evento);
+        },
+      ),
     );
   }
 
-  Widget _buildSkaiItem() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.grey.shade200,
+  Widget _buildEventCard(Evento evento) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF5C6BC0)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
-        const SizedBox(height: 4),
-        Text('SkAI', style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                evento.eventName,
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildInfoRow(Icons.calendar_today, _formatDate(evento.eventDate)),
+              const SizedBox(height: 8),
+              _buildInfoRow(Icons.location_on, evento.locationName),
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white54, thickness: 1),
+              const SizedBox(height: 8),
+              _buildInfoRow(Icons.thermostat, evento.temperature ?? 'Cargando...'),
+              const SizedBox(height: 8),
+              _buildInfoRow(Icons.water_drop, evento.precipitation ?? 'Cargando...'),
+              if (evento.windSpeed != null) ...[
+                const SizedBox(height: 8),
+                _buildInfoRow(Icons.air, evento.windSpeed!),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ],
     );
   }
 
+  String _formatDate(DateTime date) {
+    final localDate = date.toLocal();
+    final months = [
+      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+    ];
+    return '${localDate.day} ${months[localDate.month - 1]} ${localDate.year} - ${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
+  }
 }
