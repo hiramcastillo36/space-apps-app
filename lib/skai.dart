@@ -350,7 +350,7 @@ class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
       case 'windy': newTheme = WeatherTheme.windy; break;
       case 'stormy': newTheme = WeatherTheme.stormy; break;
       case 'snowy': newTheme = WeatherTheme.snowy; break;
-      case 'cold': newTheme = WeatherTheme.cloudy; break;
+      case 'cold': newTheme = WeatherTheme.snowy; break;
       case 'snow': newTheme = WeatherTheme.snowy; break;
 
     // Los moods que no son de clima se mapean a 'normal'
