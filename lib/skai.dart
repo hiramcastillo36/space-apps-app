@@ -1,15 +1,18 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// Modelo simple para un mensaje en el chat
+// --- Modelos y Enums ---
 class ChatMessage {
   final String text;
   final bool isUser;
-
   ChatMessage({required this.text, required this.isUser});
 }
 
+enum WeatherTheme { normal, sunny, verySunny, rainy }
+
+// --- Widget Principal ---
 class SkaiPage extends StatefulWidget {
   const SkaiPage({super.key});
 
@@ -17,36 +20,129 @@ class SkaiPage extends StatefulWidget {
   State<SkaiPage> createState() => _SkaiPageState();
 }
 
-class _SkaiPageState extends State<SkaiPage> {
+class _SkaiPageState extends State<SkaiPage> with TickerProviderStateMixin {
+  // 1. DECLARACIÓN DE VARIABLES DE ESTADO
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
+  final LinearGradient _brandGradient = LinearGradient(
+    colors: [Colors.pink.shade300, Colors.purple.shade400],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   bool _isInitialState = true;
   bool _isTyping = false;
-
-  // Control de concurrencia para respuestas (evita carreras)
   int _replySession = 0;
+  WeatherTheme _currentTheme = WeatherTheme.normal;
 
-  // Gradiente consistente con Index/Profile
-  static const LinearGradient _brandGradient = LinearGradient(
-    colors: [Color(0xFF5B86E5), Color(0xFF9C27B0), Color(0xFFE91E63)],
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-  );
+  // Controladores de animación declarados como 'late'
+  late final AnimationController _sunController;
+  late final AnimationController _rainController;
+
+  // 2. MÉTODOS DE CICLO DE VIDA (initState y dispose)
+  @override
+  void initState() {
+    super.initState();
+    // Inicialización de los controladores de animación
+    _sunController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    )..repeat();
+
+    _rainController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    _messages.add(
+      ChatMessage(
+        text: "Hola! Soy SkAI, tu asistente de actividades. ¿Qué te gustaría hacer hoy?",
+        isUser: false,
+      ),
+    );
+  }
 
   @override
   void dispose() {
+    // Desechar todos los controladores
     _controller.dispose();
     _scrollController.dispose();
+    _sunController.dispose();
+    _rainController.dispose();
     super.dispose();
   }
 
+  // 3. MÉTODO BUILD
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AnimatedContainer(
+                duration: const Duration(seconds: 1),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  gradient: _getCurrentGradient(),
+                ),
+              ),
+            ),
+            _buildWeatherAnimations(), // Animaciones de clima
+            Positioned.fill(
+              child: IgnorePointer(
+                child: BackgroundArcs(
+                  color: const Color(0xFFEDEFF3).withOpacity(0.5),
+                  stroke: 20,
+                  gap: 20,
+                  maxCoverage: 0.50,
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _isInitialState
+                        ? _buildInitialView()
+                        : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      itemCount: _messages.length + (_isTyping ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (_isTyping && index == _messages.length) {
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 8.0, horizontal: 4.0),
+                              child: _skaiGifCircle(size: 56),
+                            ),
+                          );
+                        }
+                        final message = _messages[index];
+                        return _buildChatBubble(message);
+                      },
+                    ),
+                  ),
+                  SafeArea(top: false, child: _buildInputArea()),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 4. MÉTODOS AYUDANTES Y DE LÓGICA
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-
-    FocusScope.of(context).unfocus();
 
     final userMessage = ChatMessage(text: text, isUser: true);
     setState(() {
@@ -59,46 +155,38 @@ class _SkaiPageState extends State<SkaiPage> {
 
     _controller.clear();
     _getSkaiResponse(userMessage.text);
-
     _scrollToBottom();
   }
 
   Future<void> _getSkaiResponse(String userInput) async {
-    final int session = ++_replySession; // token de sesión
+    final int session = ++_replySession;
     String responseText;
     final input = userInput.toLowerCase();
 
+    WeatherTheme newTheme = _currentTheme;
+
     if (input.contains('soccer') || input.contains('jugar')) {
       responseText =
-          "Hey Chino, I wouldn't recommend playing right now, looks like there's a chance of rain around 4 PM in San Luis Potosi. Maybe plan something indoors so you don't get caught in the rain";
-    } else if (input.contains('hot') || input.contains('calor')) {
-      responseText = "It’s very hot";
+      "No te recomiendo jugar ahora, parece que habrá lluvia cerca de las 4 PM. Mejor planea algo en interiores.";
+      newTheme = WeatherTheme.rainy;
+    } else if (input.contains('20') || input.contains('soleado')) {
+      responseText = "Claro, el clima para hoy es soleado con una temperatura de 20°C.";
+      newTheme = WeatherTheme.sunny;
+    } else if (input.contains('35') || input.contains('calor')) {
+      responseText = "¡Sí, hace mucho calor! La temperatura es de 35°C, un día ultra soleado.";
+      newTheme = WeatherTheme.verySunny;
     } else {
-      responseText = "You're welcome Chino :)";
+      responseText = "¡Claro! ¿En qué más te puedo ayudar?";
+      newTheme = WeatherTheme.normal;
     }
 
     setState(() => _isTyping = true);
-
-    // Simula “pensando…”
     await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted || session != _replySession) return;
+
     setState(() {
       _messages.add(ChatMessage(text: responseText, isUser: false));
-    });
-    _scrollToBottom();
-
-    // Secuencia de “gracias”
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted || session != _replySession) return;
-    setState(() {
-      _messages.add(ChatMessage(text: "Thanks Oliv", isUser: true));
-    });
-    _scrollToBottom();
-
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted || session != _replySession) return;
-    setState(() {
-      _messages.add(ChatMessage(text: "You're welcome Chino :)", isUser: false));
+      _currentTheme = newTheme;
       _isTyping = false;
     });
     _scrollToBottom();
@@ -116,78 +204,43 @@ class _SkaiPageState extends State<SkaiPage> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // 1) Fondo base (gradiente) - ABAJO
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.lightBlue.shade100, Colors.pink.shade100],
-                  ),
-                ),
-              ),
-            ),
-            // 2) Semicírculos - ARRIBA del gradiente
-            Positioned.fill(
-              child: IgnorePointer(
-                child: BackgroundArcs(
-                color: Color(0xFFEDEFF3),
-                stroke: 20,
-                gap: 20,
-                maxCoverage: 0.50,
-                alignment: Alignment.centerLeft,
-              ),
-              ),
-            ),
-            // 3) Contenido
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => FocusScope.of(context).unfocus(),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: _isInitialState
-                        ? _buildInitialView()
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            itemCount: _messages.length + (_isTyping ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (_isTyping && index == _messages.length) {
-                                // sphere.gif como "typing bubble"
-                                return Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 8.0, horizontal: 4.0),
-                                    child: _skaiGifCircle(size: 56),
-                                  ),
-                                );
-                              }
-                              final message = _messages[index];
-                              return _buildChatBubble(message);
-                            },
-                          ),
-                  ),
-                  // Área de entrada
-                  SafeArea(top: false, child: _buildInputArea()),
-                ],
-              ),
-            ),
-          ],
+  LinearGradient _getCurrentGradient() {
+    switch (_currentTheme) {
+      case WeatherTheme.sunny:
+        return LinearGradient(colors: [Colors.lightBlue.shade200, Colors.yellow.shade400], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.verySunny:
+        return LinearGradient(colors: [Colors.yellow.shade500, Colors.orange.shade700], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.rainy:
+        return LinearGradient(colors: [Colors.blueGrey.shade700, Colors.grey.shade500], begin: Alignment.topLeft, end: Alignment.bottomRight);
+      case WeatherTheme.normal:
+      default:
+        return LinearGradient(colors: [Colors.lightBlue.shade100, Colors.pink.shade100], begin: Alignment.topLeft, end: Alignment.bottomRight);
+    }
+  }
+
+
+
+  // 5. WIDGETS DE UI (BUILDERS)
+  Widget _buildWeatherAnimations() {
+    return Stack(
+      children: [
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 800),
+          opacity: (_currentTheme == WeatherTheme.sunny || _currentTheme == WeatherTheme.verySunny) ? 1.0 : 0.0,
+          child: _SunWidget(
+            controller: _sunController, // SIN '!'
+            isVerySunny: _currentTheme == WeatherTheme.verySunny,
+          ),
         ),
-      ),
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 800),
+          opacity: _currentTheme == WeatherTheme.rainy ? 1.0 : 0.0,
+          child: _RainWidget(controller: _rainController), // SIN '!'
+        ),
+      ],
     );
   }
 
-  // --- UI secciones ---
 
   Widget _buildInitialView() {
     return Center(
@@ -204,7 +257,7 @@ class _SkaiPageState extends State<SkaiPage> {
                 style: GoogleFonts.poppins(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white, // necesario para pintar gradiente
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -220,7 +273,6 @@ class _SkaiPageState extends State<SkaiPage> {
 
   Widget _buildChatBubble(ChatMessage message) {
     if (!message.isUser) {
-      // SkAI: GIF a la izquierda + tarjeta con texto
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -251,7 +303,6 @@ class _SkaiPageState extends State<SkaiPage> {
       );
     }
 
-    // Usuario: burbuja a la derecha
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -276,18 +327,16 @@ class _SkaiPageState extends State<SkaiPage> {
     );
   }
 
-  // sphere.gif como “burbuja” circular / avatar
   Widget _skaiGifCircle({double size = 56}) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: size * 0.06), // aro sutil
+        border: Border.all(color: Colors.white, width: size * 0.06),
       ),
       child: ClipOval(
         child: Image.asset(
-          // ⚠️ En Flutter usa ruta relativa de assets (no D:\...). Decláralo en pubspec.yaml
           'assets/images/sphere.gif',
           fit: BoxFit.cover,
           gaplessPlayback: true,
@@ -313,7 +362,7 @@ class _SkaiPageState extends State<SkaiPage> {
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.9),
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30.0),
                   borderSide: BorderSide(color: Colors.black12.withOpacity(0.05)),
@@ -335,7 +384,7 @@ class _SkaiPageState extends State<SkaiPage> {
             onTap: _sendMessage,
             child: Container(
               padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
+              decoration:  BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: _brandGradient,
               ),
@@ -346,10 +395,9 @@ class _SkaiPageState extends State<SkaiPage> {
       ),
     );
   }
-
 }
 
-/// ===== Fondo con semicírculos concéntricos lado izquierdo (reusable) =====
+// --- Widget de Fondo (sin cambios) ---
 class BackgroundArcs extends StatelessWidget {
   const BackgroundArcs({
     super.key,
@@ -421,11 +469,119 @@ class _ArcsPainter extends CustomPainter {
       final r = maxRadius - i * step;
       if (r <= 0) break;
       final rect = Rect.fromCircle(center: center, radius: r);
-      // Semicírculo derecho
       canvas.drawArc(rect, -1.57079632679, 3.14159265359, false, paint);
     }
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// --- NUEVOS WIDGETS DE ANIMACIÓN ---
+
+class _SunWidget extends StatelessWidget {
+  final AnimationController controller;
+  final bool isVerySunny;
+
+  const _SunWidget({required this.controller, required this.isVerySunny});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 40,
+      right: 40,
+      child: RotationTransition(
+        turns: controller,
+        child: Icon(
+          Icons.wb_sunny_rounded,
+          color: isVerySunny ? Colors.orangeAccent.shade400.withOpacity(0.8) : Colors.yellow.shade600.withOpacity(0.8),
+          size: isVerySunny ? 120 : 100,
+          shadows: [
+            BoxShadow(
+              color: isVerySunny ? Colors.orange.withOpacity(0.5) : Colors.yellow.withOpacity(0.5),
+              blurRadius: 30,
+              spreadRadius: 10,
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RainWidget extends StatefulWidget {
+  final AnimationController controller;
+  const _RainWidget({required this.controller});
+
+  @override
+  State<_RainWidget> createState() => _RainWidgetState();
+}
+
+class _RainWidgetState extends State<_RainWidget> {
+  late final List<_Raindrop> raindrops;
+
+  @override
+  void initState() {
+    super.initState();
+    raindrops = List.generate(
+      100,
+          (index) => _Raindrop(
+        x: math.Random().nextDouble(),
+        y: math.Random().nextDouble(),
+        speed: math.Random().nextDouble() * 0.4 + 0.2,
+        length: math.Random().nextDouble() * 15 + 10,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, child) {
+        return CustomPaint(
+          size: Size.infinite,
+          painter: _RainPainter(
+            raindrops: raindrops,
+            animationValue: widget.controller.value,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RainPainter extends CustomPainter {
+  final List<_Raindrop> raindrops;
+  final double animationValue;
+
+  _RainPainter({required this.raindrops, required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.6)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    for (var drop in raindrops) {
+      final startY = (drop.y + animationValue * drop.speed) % 1.0;
+      final p1 = Offset(drop.x * size.width, startY * size.height);
+      final p2 = Offset(drop.x * size.width, (startY * size.height) + drop.length);
+      canvas.drawLine(p1, p2, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RainPainter oldDelegate) {
+    return animationValue != oldDelegate.animationValue;
+  }
+}
+
+class _Raindrop {
+  final double x;
+  final double y;
+  final double speed;
+  final double length;
+  _Raindrop({required this.x, required this.y, required this.speed, required this.length});
 }
